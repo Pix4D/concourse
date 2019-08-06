@@ -3,9 +3,11 @@ package worker_test
 import (
 	"code.cloudfoundry.org/lager"
 	"code.cloudfoundry.org/lager/lagertest"
+
 	//"code.cloudfoundry.org/garden/gardenfakes"
-	"context"
+
 	"errors"
+
 	"github.com/concourse/concourse/atc"
 	"github.com/concourse/concourse/atc/db/dbfakes"
 	. "github.com/concourse/concourse/atc/worker"
@@ -110,7 +112,6 @@ var _ = Describe("Pool", func() {
 
 		JustBeforeEach(func() {
 			chosenWorker, chooseErr = pool.FindOrChooseWorkerForContainer(
-				context.TODO(),
 				logger,
 				fakeOwner,
 				spec,
@@ -260,15 +261,15 @@ var _ = Describe("Pool", func() {
 				})
 
 				It("checks that the workers satisfy the given worker spec", func() {
-					Expect(workerA.SatisfiesCallCount()).To(Equal(1))
+					Expect(workerA.SatisfiesCallCount()).To(Equal(2))
 					_, actualSpec := workerA.SatisfiesArgsForCall(0)
 					Expect(actualSpec).To(Equal(workerSpec))
 
-					Expect(workerB.SatisfiesCallCount()).To(Equal(1))
+					Expect(workerB.SatisfiesCallCount()).To(Equal(2))
 					_, actualSpec = workerB.SatisfiesArgsForCall(0)
 					Expect(actualSpec).To(Equal(workerSpec))
 
-					Expect(workerC.SatisfiesCallCount()).To(Equal(1))
+					Expect(workerC.SatisfiesCallCount()).To(Equal(2))
 					_, actualSpec = workerC.SatisfiesArgsForCall(0)
 					Expect(actualSpec).To(Equal(workerSpec))
 				})

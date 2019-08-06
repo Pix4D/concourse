@@ -1,17 +1,18 @@
 package worker_test
 
 import (
-	"code.cloudfoundry.org/garden"
-	"code.cloudfoundry.org/garden/gardenfakes"
 	"context"
 	"errors"
 	"fmt"
+	"path"
+
+	"code.cloudfoundry.org/garden"
+	"code.cloudfoundry.org/garden/gardenfakes"
 	"github.com/concourse/concourse/atc"
 	"github.com/concourse/concourse/atc/db/lock/lockfakes"
 	"github.com/concourse/concourse/atc/exec/execfakes"
 	"github.com/concourse/concourse/atc/runtime"
 	"github.com/onsi/gomega/gbytes"
-	"path"
 
 	"code.cloudfoundry.org/lager/lagertest"
 	"github.com/concourse/baggageclaim"
@@ -25,10 +26,10 @@ import (
 
 var _ = Describe("Client", func() {
 	var (
-		logger       *lagertest.TestLogger
-		fakePool     *workerfakes.FakePool
-		fakeProvider *workerfakes.FakeWorkerProvider
-		client       worker.Client
+		logger          *lagertest.TestLogger
+		fakePool        *workerfakes.FakePool
+		fakeProvider    *workerfakes.FakeWorkerProvider
+		client          worker.Client
 		fakeLockFactory *lockfakes.FakeLockFactory
 	)
 
@@ -323,7 +324,8 @@ var _ = Describe("Client", func() {
 			fakeLockFactory = new(lockfakes.FakeLockFactory)
 			fakeLockFactory.AcquireReturns(fakeLock, true, nil)
 
-			fakePool.FindOrChooseWorkerForContainerReturns(fakeWorker, nil)
+			fakePool.FindWorkerForContainerReturns(nil, nil)
+			fakePool.ChooseWorkerForContainerReturns(fakeWorker, nil)
 			eventChan = make(chan runtime.Event, 1)
 			ctx, cancel = context.WithCancel(context.Background())
 		})
@@ -336,13 +338,13 @@ var _ = Describe("Client", func() {
 
 			It("chooses a worker", func() {
 				Expect(err).ToNot(HaveOccurred())
-				Expect(fakePool.FindOrChooseWorkerForContainerCallCount()).To(Equal(1))
+				Expect(fakePool.FindWorkerForContainerCallCount()).To(Equal(1))
+				Expect(fakePool.ChooseWorkerForContainerCallCount()).To(Equal(1))
 			})
 
 			Context("when 'limit-active-tasks' strategy is chosen and a worker found", func() {
 				BeforeEach(func() {
 					fakeWorker.NameReturns("some-worker")
-					fakePool.FindOrChooseWorkerForContainerReturns(fakeWorker, nil)
 
 					fakeContainer := new(workerfakes.FakeContainer)
 					fakeWorker.FindOrCreateContainerReturns(fakeContainer, nil)
@@ -358,7 +360,7 @@ var _ = Describe("Client", func() {
 				workerDisaster := errors.New("worker selection failed")
 
 				BeforeEach(func() {
-					fakePool.FindOrChooseWorkerForContainerReturns(nil, workerDisaster)
+					fakePool.ChooseWorkerForContainerReturns(nil, workerDisaster)
 				})
 
 				It("returns the error", func() {

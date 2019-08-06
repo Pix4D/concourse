@@ -237,7 +237,7 @@ var _ = Describe("ResourceScanner", func() {
 					err := fakeDBResource.SetCheckSetupErrorArgsForCall(0)
 					Expect(err).To(BeNil())
 
-					_, _, owner, containerSpec, workerSpec, _ := fakePool.FindOrChooseWorkerForContainerArgsForCall(0)
+					_, owner, containerSpec, workerSpec, _ := fakePool.FindOrChooseWorkerForContainerArgsForCall(0)
 					Expect(owner).To(Equal(db.NewResourceConfigCheckSessionContainerOwner(fakeResourceConfig, radar.ContainerExpiries)))
 					Expect(containerSpec.ImageSpec).To(Equal(worker.ImageSpec{
 						ResourceType: "git",
@@ -660,7 +660,7 @@ var _ = Describe("ResourceScanner", func() {
 				err := fakeDBResource.SetCheckSetupErrorArgsForCall(0)
 				Expect(err).To(BeNil())
 
-				_, _, owner, containerSpec, workerSpec, _ := fakePool.FindOrChooseWorkerForContainerArgsForCall(0)
+				_, owner, containerSpec, workerSpec, _ := fakePool.FindOrChooseWorkerForContainerArgsForCall(0)
 				Expect(owner).To(Equal(db.NewResourceConfigCheckSessionContainerOwner(fakeResourceConfig, radar.ContainerExpiries)))
 				Expect(containerSpec.ImageSpec).To(Equal(worker.ImageSpec{
 					ResourceType: "git",
