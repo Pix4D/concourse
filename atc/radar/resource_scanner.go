@@ -323,7 +323,6 @@ func (scanner *resourceScanner) check(
 	owner := db.NewResourceConfigCheckSessionContainerOwner(resourceConfigScope.ResourceConfig(), ContainerExpiries)
 
 	chosenWorker, err := scanner.pool.FindOrChooseWorkerForContainer(
-		context.Background(),
 		logger,
 		owner,
 		containerSpec,

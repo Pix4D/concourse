@@ -1,7 +1,6 @@
 package worker
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"math/rand"
@@ -14,7 +13,6 @@ import (
 )
 
 //go:generate counterfeiter . WorkerProvider
-
 
 type WorkerProvider interface {
 	RunningWorkers(lager.Logger) ([]Worker, error)
@@ -65,8 +63,20 @@ type Pool interface {
 		WorkerSpec,
 	) (Worker, error)
 
+	FindWorkerForContainer(
+		lager.Logger,
+		db.ContainerOwner,
+		WorkerSpec,
+	) (Worker, error)
+
+	ChooseWorkerForContainer(
+		lager.Logger,
+		ContainerSpec,
+		WorkerSpec,
+		ContainerPlacementStrategy,
+	) (Worker, error)
+
 	FindOrChooseWorkerForContainer(
-		context.Context,
 		lager.Logger,
 		db.ContainerOwner,
 		ContainerSpec,
@@ -125,14 +135,21 @@ func (pool *pool) allSatisfying(logger lager.Logger, spec WorkerSpec) ([]Worker,
 	}
 }
 
-func (pool *pool) FindOrChooseWorkerForContainer(
-	ctx context.Context,
-	logger lager.Logger,
-	owner db.ContainerOwner,
-	containerSpec ContainerSpec,
-	workerSpec WorkerSpec,
-	strategy ContainerPlacementStrategy,
-) (Worker, error) {
+func (pool *pool) ChooseWorkerForContainer(logger lager.Logger, containerSpec ContainerSpec, workerSpec WorkerSpec, strategy ContainerPlacementStrategy) (Worker, error) {
+	compatibleWorkers, err := pool.allSatisfying(logger, workerSpec)
+	if err != nil {
+		return nil, err
+	}
+
+	worker, err := strategy.Choose(logger, compatibleWorkers, containerSpec)
+	if err != nil {
+		return nil, err
+	}
+
+	return worker, nil
+}
+
+func (pool *pool) FindWorkerForContainer(logger lager.Logger, owner db.ContainerOwner, workerSpec WorkerSpec) (Worker, error) {
 	workersWithContainer, err := pool.provider.FindWorkersForContainerByOwner(
 		logger.Session("find-worker"),
 		owner,
@@ -157,8 +174,24 @@ dance:
 		}
 	}
 
+	return worker, nil
+}
+
+func (pool *pool) FindOrChooseWorkerForContainer(
+	logger lager.Logger,
+	owner db.ContainerOwner,
+	containerSpec ContainerSpec,
+	workerSpec WorkerSpec,
+	strategy ContainerPlacementStrategy,
+) (Worker, error) {
+
+	worker, err := pool.FindWorkerForContainer(logger, owner, workerSpec)
+	if err != nil {
+		return nil, err
+	}
+
 	if worker == nil {
-		worker, err = strategy.Choose(logger, compatibleWorkers, containerSpec)
+		worker, err = pool.ChooseWorkerForContainer(logger, containerSpec, workerSpec, strategy)
 		if err != nil {
 			return nil, err
 		}

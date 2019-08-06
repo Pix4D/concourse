@@ -139,7 +139,7 @@ func (client *client) RunTaskStep(
 		processSpec.StdoutWriter,
 	)
 	if err != nil {
-		return TaskResult{Status: - 1, VolumeMounts: []VolumeMount{}, Err: err}
+		return TaskResult{Status: -1, VolumeMounts: []VolumeMount{}, Err: err}
 	}
 
 	if strategy.ModifiesActiveTasks() {
@@ -157,7 +157,7 @@ func (client *client) RunTaskStep(
 	)
 
 	if err != nil {
-		return TaskResult{Status: - 1, VolumeMounts: []VolumeMount{}, Err: err}
+		return TaskResult{Status: -1, VolumeMounts: []VolumeMount{}, Err: err}
 	}
 
 	// container already exited
@@ -167,7 +167,7 @@ func (client *client) RunTaskStep(
 
 		status, err := strconv.Atoi(exitStatusProp)
 		if err != nil {
-			return TaskResult{- 1, []VolumeMount{}, err}
+			return TaskResult{-1, []VolumeMount{}, err}
 		}
 
 		return TaskResult{Status: status, VolumeMounts: container.VolumeMounts(), Err: nil}
@@ -275,16 +275,19 @@ func (client *client) chooseTaskWorker(
 			}
 		}
 
-		chosenWorker, err = client.pool.FindOrChooseWorkerForContainer(
-			ctx,
-			logger,
-			owner,
-			containerSpec,
-			workerSpec,
-			strategy,
-		)
+		existingContainer := false
+		chosenWorker, err = client.pool.FindWorkerForContainer(logger, owner, workerSpec)
 		if err != nil {
 			return nil, err
+		}
+
+		if chosenWorker != nil {
+			existingContainer = true
+		} else {
+			chosenWorker, err = client.pool.ChooseWorkerForContainer(logger, containerSpec, workerSpec, strategy)
+			if err != nil {
+				return nil, err
+			}
 		}
 
 		if strategy.ModifiesActiveTasks() {
@@ -308,9 +311,11 @@ func (client *client) chooseTaskWorker(
 				continue
 			}
 
-			err = chosenWorker.IncreaseActiveTasks()
-			if err != nil {
-				logger.Error("failed-to-increase-active-tasks", err)
+			if !existingContainer {
+				err = chosenWorker.IncreaseActiveTasks()
+				if err != nil {
+					logger.Error("failed-to-increase-active-tasks", err)
+				}
 			}
 
 			err = activeTasksLock.Release()

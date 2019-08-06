@@ -179,7 +179,6 @@ func (step *GetStep) Run(ctx context.Context, state RunState) error {
 	)
 
 	chosenWorker, err := step.workerPool.FindOrChooseWorkerForContainer(
-		ctx,
 		logger,
 		resourceInstance.ContainerOwner(),
 		containerSpec,
