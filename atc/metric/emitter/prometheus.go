@@ -39,6 +39,7 @@ type PrometheusEmitter struct {
 	pipelineScheduled *prometheus.CounterVec
 
 	resourceChecksVec *prometheus.CounterVec
+	checksVec         *prometheus.CounterVec
 
 	schedulingFullDuration    *prometheus.CounterVec
 	schedulingLoadingDuration *prometheus.CounterVec
@@ -339,7 +340,18 @@ func (config *PrometheusConfig) NewEmitter() (metric.Emitter, error) {
 		},
 		[]string{"platform", "team", "tags"},
 	)
+
 	prometheus.MustRegister(taskQueue)
+	checksVec := prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: "concourse",
+			Subsystem: "lidar",
+			Name:      "checks_total",
+			Help:      "Counts the number of checks finished",
+		},
+		[]string{"scopeID", "checkName"},
+	)
+	prometheus.MustRegister(checksVec)
 
 	listener, err := net.Listen("tcp", config.bind())
 	if err != nil {
@@ -370,6 +382,7 @@ func (config *PrometheusConfig) NewEmitter() (metric.Emitter, error) {
 		pipelineScheduled: pipelineScheduled,
 
 		resourceChecksVec: resourceChecksVec,
+		checksVec:         checksVec,
 
 		schedulingFullDuration:    schedulingFullDuration,
 		schedulingLoadingDuration: schedulingLoadingDuration,
@@ -437,6 +450,8 @@ func (emitter *PrometheusEmitter) Emit(logger lager.Logger, event metric.Event) 
 		emitter.resourceMetric(logger, event)
 	case "tasks queue":
 		emitter.taskQueueMetric(logger, event)
+	case "check finished":
+		emitter.checkMetric(logger, event)
 	default:
 		// unless we have a specific metric, we do nothing
 	}
@@ -809,6 +824,19 @@ func (emitter *PrometheusEmitter) taskQueueMetric(logger lager.Logger, event met
 	}
 
 	emitter.taskQueue.WithLabelValues(platform, team, tags).Set(float64(value))
+func (emitter *PrometheusEmitter) checkMetric(logger lager.Logger, event metric.Event) {
+	scopeID, exists := event.Attributes["scope_id"]
+	if !exists {
+		logger.Error("failed-to-find-resource-config-scope-id-in-event", fmt.Errorf("expected scope_id to exist in event.Attributes"))
+		return
+	}
+	checkName, exists := event.Attributes["check_name"]
+	if !exists {
+		logger.Error("failed-to-find-check-name-in-event", fmt.Errorf("expected check_name to exist in event.Attributes"))
+		return
+	}
+
+	emitter.checksVec.WithLabelValues(scopeID, checkName).Inc()
 }
 
 // updateLastSeen tracks for each worker when it last received a metric event.
