@@ -53,6 +53,7 @@ type PrometheusEmitter struct {
 	workerUnknownVolumes    *prometheus.GaugeVec
 	workerTasks             *prometheus.GaugeVec
 	workersRegistered       *prometheus.GaugeVec
+	taskQueue               *prometheus.GaugeVec
 
 	workerContainersLabels map[string]map[string]prometheus.Labels
 	workerVolumesLabels    map[string]map[string]prometheus.Labels
@@ -365,6 +366,16 @@ func (config *PrometheusConfig) NewEmitter() (metric.Emitter, error) {
 		},
 	)
 	prometheus.MustRegister(checkQueueSize)
+	taskQueue := prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Namespace: "concourse",
+			Subsystem: "taskqueue",
+			Name:      "tasks_queue",
+			Help:      "Current number of tasks in queue",
+		},
+		[]string{"platform", "team", "tags"},
+	)
+	prometheus.MustRegister(taskQueue)
 
 	listener, err := net.Listen("tcp", config.bind())
 	if err != nil {
@@ -413,6 +424,7 @@ func (config *PrometheusConfig) NewEmitter() (metric.Emitter, error) {
 		workerTasks:             workerTasks,
 		workerUnknownContainers: workerUnknownContainers,
 		workerUnknownVolumes:    workerUnknownVolumes,
+		taskQueue:               taskQueue,
 	}
 	go emitter.periodicMetricGC()
 
@@ -471,6 +483,8 @@ func (emitter *PrometheusEmitter) Emit(logger lager.Logger, event metric.Event) 
 		emitter.checkMetric(logger, event)
 	case "check finished":
 		emitter.checkMetric(logger, event)
+	case "tasks queue":
+		emitter.taskQueueMetric(logger, event)
 	default:
 		// unless we have a specific metric, we do nothing
 	}
@@ -867,6 +881,32 @@ func (emitter *PrometheusEmitter) checkMetric(logger lager.Logger, event metric.
 	duration = duration / 1000
 
 	emitter.checksVec.WithLabelValues(scopeID, checkStatus).Observe(duration)
+}
+
+func (emitter *PrometheusEmitter) taskQueueMetric(logger lager.Logger, event metric.Event) {
+	value, ok := event.Value.(int)
+	if !ok {
+		logger.Error("tasks-queue-length-type-mismatch", fmt.Errorf("expected event.Value to be a int"))
+		return
+	}
+	platform, exists := event.Attributes["platform"]
+	if !exists {
+		logger.Error("failed-to-find-platform-in-event", fmt.Errorf("expected platform to exist in event.Attributes"))
+		return
+	}
+	team, exists := event.Attributes["team"]
+	if !exists {
+		logger.Error("failed-to-find-team-in-event", fmt.Errorf("expected team to exist in event.Attributes"))
+		return
+	}
+	tags, exists := event.Attributes["tags"]
+	if !exists {
+		logger.Error("failed-to-find-tags-in-event", fmt.Errorf("expected tags to exist in event.Attributes"))
+		return
+	}
+
+	fmt.Printf("plat: %s, team: %s, tags: %s", platform, team, tags)
+	emitter.taskQueue.WithLabelValues(platform, team, tags).Set(float64(value))
 }
 
 // updateLastSeen tracks for each worker when it last received a metric event.
