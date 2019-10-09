@@ -604,7 +604,8 @@ func (cmd *RunCommand) constructAPIMembers(
 	)
 
 	pool := worker.NewPool(workerProvider)
-	workerClient := worker.NewClient(pool, workerProvider)
+	taskQueue := db.NewTaskQueue(dbConn)
+	workerClient := worker.NewClient(pool, workerProvider, taskQueue)
 
 	credsManagers := cmd.CredentialManagers
 	dbPipelineFactory := db.NewPipelineFactory(dbConn, lockFactory)
@@ -782,7 +783,8 @@ func (cmd *RunCommand) constructBackendMembers(
 	)
 
 	pool := worker.NewPool(workerProvider)
-	workerClient := worker.NewClient(pool, workerProvider)
+	taskQueue := db.NewTaskQueue(dbConn)
+	workerClient := worker.NewClient(pool, workerProvider, taskQueue)
 
 	defaultLimits, err := cmd.parseDefaultLimits()
 	if err != nil {
