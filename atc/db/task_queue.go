@@ -91,10 +91,9 @@ func (queue *taskQueue) Position(id string) (position int, err error) {
 			return 0, err
 		}
 	}
-	tasks_positions := psql.Select("row_number() over (), id").
+	tasks_positions := psql.Select("row_number() over (order by insert_time), id").
 		From("tasks_queue").
-		Where(sq.Eq{"platform": platform, "team_id": teamId, "worker_tag": workerTag}).
-		OrderBy("insert_time")
+		Where(sq.Eq{"platform": platform, "team_id": teamId, "worker_tag": workerTag})
 	err = psql.Select("row_number").
 		FromSelect(tasks_positions, "subq").
 		Where(sq.Eq{"id": id}).
