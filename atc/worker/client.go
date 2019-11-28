@@ -332,7 +332,7 @@ func (client *client) chooseTaskWorker(
 				workerTags := strings.Join(tags, "_")
 				queue_position, qlen, err := client.taskQueue.FindOrAppend(taskId, workerSpec.Platform, teamId, workerTags, logger)
 				if !alreadyQueued {
-					defer client.taskQueue.Dequeue(taskId, logger)
+					defer dequeue(client.taskQueue, taskId, workerSpec.Platform, teamId, workerTags, logger)
 					alreadyQueued = true
 				}
 				if err != nil {
@@ -419,7 +419,6 @@ func (client *client) chooseTaskWorker(
 				}
 			}
 		}
-
 		break
 	}
 
@@ -432,6 +431,21 @@ func decreaseActiveTasks(logger lager.Logger, w Worker) {
 		logger.Error("failed-to-decrease-active-tasks", err)
 		return
 	}
+}
+
+func dequeue(queue db.TaskQueue, taskId string, platform string, teamId int, workerTags string, logger lager.Logger) {
+	queue.Dequeue(taskId, logger)
+	qlen, err := queue.Length(taskId)
+	if err != nil {
+		logger.Error("failed-to-fetch-queue-length", err)
+		return
+	}
+	metric.TaskQueue{
+		Length:     qlen,
+		Platform:   platform,
+		Team:       teamId,
+		WorkerTags: workerTags,
+	}.Emit(logger)
 }
 
 type processStatus struct {
