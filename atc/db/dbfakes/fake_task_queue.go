@@ -15,6 +15,19 @@ type FakeTaskQueue struct {
 		arg1 string
 		arg2 lager.Logger
 	}
+	ElapsedStub        func(string) (int, error)
+	elapsedMutex       sync.RWMutex
+	elapsedArgsForCall []struct {
+		arg1 string
+	}
+	elapsedReturns struct {
+		result1 int
+		result2 error
+	}
+	elapsedReturnsOnCall map[int]struct {
+		result1 int
+		result2 error
+	}
 	FindOrAppendStub        func(string, string, int, string, lager.Logger) (int, int, error)
 	findOrAppendMutex       sync.RWMutex
 	findOrAppendArgsForCall []struct {
@@ -111,6 +124,69 @@ func (fake *FakeTaskQueue) DequeueArgsForCall(i int) (string, lager.Logger) {
 	defer fake.dequeueMutex.RUnlock()
 	argsForCall := fake.dequeueArgsForCall[i]
 	return argsForCall.arg1, argsForCall.arg2
+}
+
+func (fake *FakeTaskQueue) Elapsed(arg1 string) (int, error) {
+	fake.elapsedMutex.Lock()
+	ret, specificReturn := fake.elapsedReturnsOnCall[len(fake.elapsedArgsForCall)]
+	fake.elapsedArgsForCall = append(fake.elapsedArgsForCall, struct {
+		arg1 string
+	}{arg1})
+	fake.recordInvocation("Elapsed", []interface{}{arg1})
+	fake.elapsedMutex.Unlock()
+	if fake.ElapsedStub != nil {
+		return fake.ElapsedStub(arg1)
+	}
+	if specificReturn {
+		return ret.result1, ret.result2
+	}
+	fakeReturns := fake.elapsedReturns
+	return fakeReturns.result1, fakeReturns.result2
+}
+
+func (fake *FakeTaskQueue) ElapsedCallCount() int {
+	fake.elapsedMutex.RLock()
+	defer fake.elapsedMutex.RUnlock()
+	return len(fake.elapsedArgsForCall)
+}
+
+func (fake *FakeTaskQueue) ElapsedCalls(stub func(string) (int, error)) {
+	fake.elapsedMutex.Lock()
+	defer fake.elapsedMutex.Unlock()
+	fake.ElapsedStub = stub
+}
+
+func (fake *FakeTaskQueue) ElapsedArgsForCall(i int) string {
+	fake.elapsedMutex.RLock()
+	defer fake.elapsedMutex.RUnlock()
+	argsForCall := fake.elapsedArgsForCall[i]
+	return argsForCall.arg1
+}
+
+func (fake *FakeTaskQueue) ElapsedReturns(result1 int, result2 error) {
+	fake.elapsedMutex.Lock()
+	defer fake.elapsedMutex.Unlock()
+	fake.ElapsedStub = nil
+	fake.elapsedReturns = struct {
+		result1 int
+		result2 error
+	}{result1, result2}
+}
+
+func (fake *FakeTaskQueue) ElapsedReturnsOnCall(i int, result1 int, result2 error) {
+	fake.elapsedMutex.Lock()
+	defer fake.elapsedMutex.Unlock()
+	fake.ElapsedStub = nil
+	if fake.elapsedReturnsOnCall == nil {
+		fake.elapsedReturnsOnCall = make(map[int]struct {
+			result1 int
+			result2 error
+		})
+	}
+	fake.elapsedReturnsOnCall[i] = struct {
+		result1 int
+		result2 error
+	}{result1, result2}
 }
 
 func (fake *FakeTaskQueue) FindOrAppend(arg1 string, arg2 string, arg3 int, arg4 string, arg5 lager.Logger) (int, int, error) {
@@ -383,6 +459,8 @@ func (fake *FakeTaskQueue) Invocations() map[string][][]interface{} {
 	defer fake.invocationsMutex.RUnlock()
 	fake.dequeueMutex.RLock()
 	defer fake.dequeueMutex.RUnlock()
+	fake.elapsedMutex.RLock()
+	defer fake.elapsedMutex.RUnlock()
 	fake.findOrAppendMutex.RLock()
 	defer fake.findOrAppendMutex.RUnlock()
 	fake.findQueueMutex.RLock()

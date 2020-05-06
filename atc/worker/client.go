@@ -434,6 +434,17 @@ func decreaseActiveTasks(logger lager.Logger, w Worker) {
 }
 
 func dequeue(queue db.TaskQueue, taskId string, platform string, teamId int, workerTags string, logger lager.Logger) {
+	elapsed, err := queue.Elapsed(taskId)
+	if err != nil {
+		logger.Error("failed-to-evaluate-elapsed-time-in-queue", err)
+	}
+	metric.QueueDuration{
+		Duration:   elapsed,
+		Platform:   platform,
+		Team:       teamId,
+		WorkerTags: workerTags,
+	}.Emit(logger)
+
 	queue.Dequeue(taskId, logger)
 	qlen, err := queue.Length(taskId)
 	if err != nil {

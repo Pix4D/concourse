@@ -51,6 +51,7 @@ type PrometheusEmitter struct {
 	workerTasks             *prometheus.GaugeVec
 	workersRegistered       *prometheus.GaugeVec
 	taskQueue               *prometheus.GaugeVec
+	queueDuration           *prometheus.HistogramVec
 
 	workerContainersLabels map[string]map[string]prometheus.Labels
 	workerVolumesLabels    map[string]map[string]prometheus.Labels
@@ -353,6 +354,18 @@ func (config *PrometheusConfig) NewEmitter() (metric.Emitter, error) {
 	)
 	prometheus.MustRegister(taskQueue)
 
+	queueDuration := prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Namespace: "concourse",
+			Subsystem: "taskqueue",
+			Name:      "queue_duration",
+			Help:      "Queue duration time in seconds",
+			Buckets:   []float64{1, 30, 60, 120, 180, 240, 300, 600, 1200},
+		},
+		[]string{"platform", "team", "tags"},
+	)
+	prometheus.MustRegister(queueDuration)
+
 	listener, err := net.Listen("tcp", config.bind())
 	if err != nil {
 		return nil, err
@@ -398,6 +411,7 @@ func (config *PrometheusConfig) NewEmitter() (metric.Emitter, error) {
 		workerUnknownContainers: workerUnknownContainers,
 		workerUnknownVolumes:    workerUnknownVolumes,
 		taskQueue:               taskQueue,
+		queueDuration:           queueDuration,
 	}
 	go emitter.periodicMetricGC()
 
@@ -452,6 +466,8 @@ func (emitter *PrometheusEmitter) Emit(logger lager.Logger, event metric.Event) 
 		emitter.checkMetric(logger, event)
 	case "tasks queue":
 		emitter.taskQueueMetric(logger, event)
+	case "queue duration":
+		emitter.queueDurationMetric(logger, event)
 	default:
 		// unless we have a specific metric, we do nothing
 	}
@@ -840,6 +856,32 @@ func (emitter *PrometheusEmitter) taskQueueMetric(logger lager.Logger, event met
 
 	fmt.Printf("plat: %s, team: %s, tags: %s", platform, team, tags)
 	emitter.taskQueue.WithLabelValues(platform, team, tags).Set(float64(value))
+}
+
+func (emitter *PrometheusEmitter) queueDurationMetric(logger lager.Logger, event metric.Event) {
+	value, ok := event.Value.(int)
+	if !ok {
+		logger.Error("queue-duration-type-mismatch", fmt.Errorf("expected event.Value to be a int"))
+		return
+	}
+	platform, exists := event.Attributes["platform"]
+	if !exists {
+		logger.Error("failed-to-find-platform-in-event", fmt.Errorf("expected platform to exist in event.Attributes"))
+		return
+	}
+	team, exists := event.Attributes["team"]
+	if !exists {
+		logger.Error("failed-to-find-team-in-event", fmt.Errorf("expected team to exist in event.Attributes"))
+		return
+	}
+	tags, exists := event.Attributes["tags"]
+	if !exists {
+		logger.Error("failed-to-find-tags-in-event", fmt.Errorf("expected tags to exist in event.Attributes"))
+		return
+	}
+
+	fmt.Printf("plat: %s, team: %s, tags: %s", platform, team, tags)
+	emitter.queueDuration.WithLabelValues(platform, team, tags).Observe(float64(value))
 }
 
 // updateLastSeen tracks for each worker when it last received a metric event.

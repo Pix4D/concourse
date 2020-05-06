@@ -3,6 +3,8 @@ package db
 import (
 	"database/sql"
 	"fmt"
+	"math"
+	"time"
 
 	"code.cloudfoundry.org/lager"
 	sq "github.com/Masterminds/squirrel"
@@ -14,6 +16,7 @@ type TaskQueue interface {
 	FindOrAppend(string, string, int, string, lager.Logger) (int, int, error)
 	FindQueue(string) (string, int, string, error)
 	Dequeue(string, lager.Logger)
+	Elapsed(string) (int, error)
 	Length(string) (int, error)
 	Position(string) (int, error)
 }
@@ -138,4 +141,19 @@ func (queue *taskQueue) Length(id string) (length int, err error) {
 		return 0, err
 	}
 	return length, nil
+}
+
+func (queue *taskQueue) Elapsed(id string) (duration int, err error) {
+	var insert_time time.Time
+	err = psql.Select("insert_time").
+		From("tasks_queue").
+		Where(sq.Eq{"id": id}).
+		RunWith(queue.conn).
+		QueryRow().
+		Scan(&insert_time)
+	if err != nil {
+		return 0, err
+	}
+	duration = int(math.Round(time.Now().Sub(insert_time).Seconds()))
+	return duration, err
 }

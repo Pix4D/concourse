@@ -667,3 +667,26 @@ func (event TaskQueue) Emit(logger lager.Logger) {
 		},
 	)
 }
+
+type QueueDuration struct {
+	Duration   int
+	Platform   string
+	Team       int
+	WorkerTags string
+}
+
+func (event QueueDuration) Emit(logger lager.Logger) {
+	emit(
+		logger.Session("tasks-queue"),
+		Event{
+			Name:  "queue duration",
+			Value: event.Duration,
+			State: EventStateOK,
+			Attributes: map[string]string{
+				"platform": event.Platform,
+				"team":     strconv.Itoa(event.Team),
+				"tags":     event.WorkerTags,
+			},
+		},
+	)
+}
