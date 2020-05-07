@@ -249,7 +249,7 @@ var _ = Describe("TaskQueue", func() {
 					_, err := dbConn.Exec("INSERT INTO tasks_queue(id, platform, team_id, worker_tag, insert_time) VALUES ('foo_id', 'foo_platform', 42, 'foo_tag', '2020-01-01 00:00:00.0+00')")
 					Expect(err).ToNot(HaveOccurred())
 				})
-				It("the elapsed time in the queue in non-null", func() {
+				It("reports the elapsed time in the queue as positive", func() {
 					duration, err := taskQueue.Elapsed("foo_id")
 					Expect(err).ToNot(HaveOccurred())
 					Expect(duration).To(BeNumerically(">", 0))

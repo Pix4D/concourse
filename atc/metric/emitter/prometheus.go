@@ -360,7 +360,7 @@ func (config *PrometheusConfig) NewEmitter() (metric.Emitter, error) {
 			Subsystem: "taskqueue",
 			Name:      "queue_duration",
 			Help:      "Queue duration time in seconds",
-			Buckets:   []float64{1, 30, 60, 120, 180, 240, 300, 600, 1200},
+			Buckets:   []float64{1, 15, 30, 60, 120, 180, 240, 300, 600, 1200},
 		},
 		[]string{"platform", "team", "tags"},
 	)
