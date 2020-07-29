@@ -30,8 +30,6 @@ var JobsScheduling = &Gauge{}
 var BuildsStarted = &Counter{}
 var BuildsRunning = &Gauge{}
 
-var TasksWaiting = &Gauge{}
-
 var ChecksFinishedWithError = &Counter{}
 var ChecksFinishedWithSuccess = &Counter{}
 var ChecksQueueSize = &Gauge{}
@@ -40,6 +38,14 @@ var ChecksEnqueued = &Counter{}
 
 var ConcurrentRequests = map[string]*Gauge{}
 var ConcurrentRequestsLimitHit = map[string]*Counter{}
+
+type TasksWaitingLabels struct {
+	TeamId     string
+	WorkerTags string
+	Platform   string
+}
+
+var TasksWaiting = map[TasksWaitingLabels]*Gauge{}
 
 type BuildCollectorDuration struct {
 	Duration time.Duration

@@ -145,7 +145,12 @@ var _ = Describe("Periodic emission of metrics", func() {
 		BeforeEach(func() {
 			gauge := &metric.Gauge{}
 			gauge.Set(123)
-			metric.TasksWaiting = gauge
+			labels := metric.TasksWaitingLabels{
+				TeamId:     "42",
+				WorkerTags: "tester",
+				Platform:   "darwin",
+			}
+			metric.TasksWaiting[labels] = gauge
 		})
 		It("emits", func() {
 			Eventually(emitter.EmitCallCount).Should(BeNumerically(">=", 1))

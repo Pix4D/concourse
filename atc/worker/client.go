@@ -7,6 +7,7 @@ import (
 	"io"
 	"path"
 	"strconv"
+	"strings"
 	"time"
 
 	"code.cloudfoundry.org/garden"
@@ -636,8 +637,17 @@ func (client *client) chooseTaskWorker(
 
 		// Increase task waiting only once
 		if elapsed == 0 {
-			metric.TasksWaiting.Inc()
-			defer metric.TasksWaiting.Dec()
+			labels := metric.TasksWaitingLabels{
+				TeamId:     strconv.Itoa(workerSpec.TeamID),
+				WorkerTags: strings.Join(containerSpec.Tags, "_"),
+				Platform:   workerSpec.Platform,
+			}
+			_, ok := metric.TasksWaiting[labels]
+			if !ok {
+				metric.TasksWaiting[labels] = &metric.Gauge{}
+			}
+			metric.TasksWaiting[labels].Inc()
+			defer metric.TasksWaiting[labels].Dec()
 		}
 
 		elapsed = waitForWorker(logger,
