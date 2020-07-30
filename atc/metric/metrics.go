@@ -47,6 +47,26 @@ type TasksWaitingLabels struct {
 
 var TasksWaiting = map[TasksWaitingLabels]*Gauge{}
 
+type TasksWaitingDuration struct {
+	Labels   TasksWaitingLabels
+	Duration time.Duration
+}
+
+func (event TasksWaitingDuration) Emit(logger lager.Logger) {
+	emit(
+		logger.Session("tasks-waiting-duration"),
+		Event{
+			Name:  "tasks waiting duration",
+			Value: event.Duration.Seconds(),
+			Attributes: map[string]string{
+				"teamId":     event.Labels.TeamId,
+				"workerTags": event.Labels.WorkerTags,
+				"platform":   event.Labels.Platform,
+			},
+		},
+	)
+}
+
 type BuildCollectorDuration struct {
 	Duration time.Duration
 }

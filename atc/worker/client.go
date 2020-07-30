@@ -580,6 +580,12 @@ func (client *client) chooseTaskWorker(
 	workerStatusPublishTicker := time.NewTicker(client.workerStatusPublishInterval)
 	defer workerStatusPublishTicker.Stop()
 
+	tasksWaitingLabels := metric.TasksWaitingLabels{
+		TeamId:     strconv.Itoa(workerSpec.TeamID),
+		WorkerTags: strings.Join(containerSpec.Tags, "_"),
+		Platform:   workerSpec.Platform,
+	}
+
 	for {
 		if chosenWorker, err = client.pool.FindOrChooseWorkerForContainer(
 			ctx,
@@ -625,6 +631,10 @@ func (client *client) chooseTaskWorker(
 			if elapsed > 0 {
 				message := fmt.Sprintf("Found a free worker after waiting %s.\n", elapsed.Round(1*time.Second))
 				writeOutputMessage(logger, outputWriter, message)
+				metric.TasksWaitingDuration{
+					Labels:   tasksWaitingLabels,
+					Duration: elapsed,
+				}.Emit(logger)
 			}
 
 			return chosenWorker, err
@@ -637,17 +647,12 @@ func (client *client) chooseTaskWorker(
 
 		// Increase task waiting only once
 		if elapsed == 0 {
-			labels := metric.TasksWaitingLabels{
-				TeamId:     strconv.Itoa(workerSpec.TeamID),
-				WorkerTags: strings.Join(containerSpec.Tags, "_"),
-				Platform:   workerSpec.Platform,
-			}
-			_, ok := metric.TasksWaiting[labels]
+			_, ok := metric.TasksWaiting[tasksWaitingLabels]
 			if !ok {
-				metric.TasksWaiting[labels] = &metric.Gauge{}
+				metric.TasksWaiting[tasksWaitingLabels] = &metric.Gauge{}
 			}
-			metric.TasksWaiting[labels].Inc()
-			defer metric.TasksWaiting[labels].Dec()
+			metric.TasksWaiting[tasksWaitingLabels].Inc()
+			defer metric.TasksWaiting[tasksWaitingLabels].Dec()
 		}
 
 		elapsed = waitForWorker(logger,
