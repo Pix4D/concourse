@@ -168,7 +168,19 @@ var _ = Describe("TaskDelegate", func() {
 			})
 
 			It("decreases the active tasks", func() {
-				Expect(fakeWorker.ActiveTasks()).To(Equal(0))
+				Expect(fakeWorker.DecreaseActiveTasksCallCount()).To(Equal(1))
+			})
+
+			Context("when saving finish event fails", func() {
+				save_error := errors.New("failed to save event")
+
+				BeforeEach(func() {
+					fakeBuild.SaveEventReturns(save_error)
+				})
+
+				It("decreases the active tasks", func() {
+					Expect(fakeWorker.DecreaseActiveTasksCallCount()).To(Equal(1))
+				})
 			})
 		})
 	})
