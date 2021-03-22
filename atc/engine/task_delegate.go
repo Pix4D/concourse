@@ -296,6 +296,12 @@ func (d *taskDelegate) Finished(
 	d.Stdout().(io.Closer).Close()
 	d.Stderr().(io.Closer).Close()
 
+	if strategy.ModifiesActiveTasks() {
+		if err := d.decreaseActiveTasks(chosenWorker); err != nil {
+			logger.Error("failed-to-decrease-active-tasks", err)
+		}
+	}
+
 	err := d.build.SaveEvent(event.FinishTask{
 		ExitStatus: int(exitStatus),
 		Time:       d.clock.Now().Unix(),
@@ -304,12 +310,6 @@ func (d *taskDelegate) Finished(
 	if err != nil {
 		logger.Error("failed-to-save-finish-event", err)
 		return
-	}
-
-	if strategy.ModifiesActiveTasks() {
-		if err := d.decreaseActiveTasks(chosenWorker); err != nil {
-			logger.Error("failed-to-decrease-active-tasks", err)
-		}
 	}
 
 	logger.Info("finished", lager.Data{"exit-status": exitStatus})
