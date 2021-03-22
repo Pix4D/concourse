@@ -1,0 +1,7 @@
+version: '3'
+
+services:
+  web:
+    environment:
+      CONCOURSE_CONTAINER_PLACEMENT_STRATEGY: limit-active-tasks
+      CONCOURSE_MAX_ACTIVE_TASKS_PER_WORKER: 1
