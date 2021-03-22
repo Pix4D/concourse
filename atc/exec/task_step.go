@@ -77,7 +77,7 @@ type TaskDelegate interface {
 	Finished(lager.Logger, ExitStatus, worker.ContainerPlacementStrategy, worker.Client)
 	SelectWorker(context.Context, worker.Pool, db.ContainerOwner, worker.ContainerSpec, worker.WorkerSpec, worker.ContainerPlacementStrategy, time.Duration, time.Duration) (worker.Client, error)
 	SelectedWorker(lager.Logger, string)
-	Errored(lager.Logger, string)
+	Errored(lager.Logger, error, worker.ContainerPlacementStrategy, worker.Client)
 }
 
 // TaskStep executes a TaskConfig, whose inputs will be fetched from the
@@ -291,8 +291,10 @@ func (step *TaskStep) run(ctx context.Context, state RunState, delegate TaskDele
 	}
 
 	if runErr != nil {
+		delegate.Errored(logger, runErr, step.strategy, chosenWorker)
 		if errors.Is(runErr, context.DeadlineExceeded) {
-			delegate.Errored(logger, TimeoutLogMessage)
+			// Treat DeadlineExceeded as a failure instead of an error
+			// even if logged as error by the delegate
 			return false, nil
 		}
 

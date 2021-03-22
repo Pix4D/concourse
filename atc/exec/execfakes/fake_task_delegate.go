@@ -17,11 +17,13 @@ import (
 )
 
 type FakeTaskDelegate struct {
-	ErroredStub        func(lager.Logger, string)
+	ErroredStub        func(lager.Logger, error, worker.ContainerPlacementStrategy, worker.Client)
 	erroredMutex       sync.RWMutex
 	erroredArgsForCall []struct {
 		arg1 lager.Logger
-		arg2 string
+		arg2 error
+		arg3 worker.ContainerPlacementStrategy
+		arg4 worker.Client
 	}
 	FetchImageStub        func(context.Context, atc.ImageResource, atc.VersionedResourceTypes, bool) (worker.ImageSpec, error)
 	fetchImageMutex       sync.RWMutex
@@ -127,17 +129,19 @@ type FakeTaskDelegate struct {
 	invocationsMutex sync.RWMutex
 }
 
-func (fake *FakeTaskDelegate) Errored(arg1 lager.Logger, arg2 string) {
+func (fake *FakeTaskDelegate) Errored(arg1 lager.Logger, arg2 error, arg3 worker.ContainerPlacementStrategy, arg4 worker.Client) {
 	fake.erroredMutex.Lock()
 	fake.erroredArgsForCall = append(fake.erroredArgsForCall, struct {
 		arg1 lager.Logger
-		arg2 string
-	}{arg1, arg2})
+		arg2 error
+		arg3 worker.ContainerPlacementStrategy
+		arg4 worker.Client
+	}{arg1, arg2, arg3, arg4})
 	stub := fake.ErroredStub
-	fake.recordInvocation("Errored", []interface{}{arg1, arg2})
+	fake.recordInvocation("Errored", []interface{}{arg1, arg2, arg3, arg4})
 	fake.erroredMutex.Unlock()
 	if stub != nil {
-		fake.ErroredStub(arg1, arg2)
+		fake.ErroredStub(arg1, arg2, arg3, arg4)
 	}
 }
 
@@ -147,17 +151,17 @@ func (fake *FakeTaskDelegate) ErroredCallCount() int {
 	return len(fake.erroredArgsForCall)
 }
 
-func (fake *FakeTaskDelegate) ErroredCalls(stub func(lager.Logger, string)) {
+func (fake *FakeTaskDelegate) ErroredCalls(stub func(lager.Logger, error, worker.ContainerPlacementStrategy, worker.Client)) {
 	fake.erroredMutex.Lock()
 	defer fake.erroredMutex.Unlock()
 	fake.ErroredStub = stub
 }
 
-func (fake *FakeTaskDelegate) ErroredArgsForCall(i int) (lager.Logger, string) {
+func (fake *FakeTaskDelegate) ErroredArgsForCall(i int) (lager.Logger, error, worker.ContainerPlacementStrategy, worker.Client) {
 	fake.erroredMutex.RLock()
 	defer fake.erroredMutex.RUnlock()
 	argsForCall := fake.erroredArgsForCall[i]
-	return argsForCall.arg1, argsForCall.arg2
+	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3, argsForCall.arg4
 }
 
 func (fake *FakeTaskDelegate) FetchImage(arg1 context.Context, arg2 atc.ImageResource, arg3 atc.VersionedResourceTypes, arg4 bool) (worker.ImageSpec, error) {

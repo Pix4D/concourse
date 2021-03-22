@@ -137,6 +137,62 @@ var _ = Describe("TaskDelegate", func() {
 		})
 	})
 
+	Describe("Errored", func() {
+		var fakeClient *workerfakes.FakeClient
+		var fakeStrategy *workerfakes.FakeContainerPlacementStrategy
+		var runErr error
+
+		BeforeEach(func() {
+			fakeClient = new(workerfakes.FakeClient)
+			fakeStrategy = new(workerfakes.FakeContainerPlacementStrategy)
+			runErr = errors.New("some-error")
+		})
+
+		JustBeforeEach(func() {
+			delegate.Errored(logger, runErr, fakeStrategy, fakeClient)
+		})
+
+		Context("when the error is a DeadlineExceeded", func() {
+			BeforeEach(func() {
+				runErr = context.DeadlineExceeded
+			})
+
+			It("saves an event", func() {
+				Expect(fakeBuild.SaveEventCallCount()).To(Equal(1))
+				event := fakeBuild.SaveEventArgsForCall(0)
+				Expect(event.EventType()).To(Equal(atc.EventType("error")))
+			})
+		})
+
+		Context("with the limit active tasks strategy", func() {
+			var fakeWorker *dbfakes.FakeWorker
+
+			BeforeEach(func() {
+				fakeStrategy.ModifiesActiveTasksReturns(true)
+
+				fakeWorker = workerStub()
+				fakeWorker.IncreaseActiveTasks()
+				fakeWorkerFactory.GetWorkerReturns(fakeWorker, true, nil)
+			})
+
+			It("decreases the active tasks", func() {
+				Expect(fakeWorker.DecreaseActiveTasksCallCount()).To(Equal(1))
+			})
+
+			Context("when saving finish event fails", func() {
+				save_error := errors.New("failed to save event")
+
+				BeforeEach(func() {
+					fakeBuild.SaveEventReturns(save_error)
+				})
+
+				It("decreases the active tasks", func() {
+					Expect(fakeWorker.DecreaseActiveTasksCallCount()).To(Equal(1))
+				})
+			})
+		})
+	})
+
 	Describe("Finished", func() {
 		var fakeClient *workerfakes.FakeClient
 		var fakeStrategy *workerfakes.FakeContainerPlacementStrategy

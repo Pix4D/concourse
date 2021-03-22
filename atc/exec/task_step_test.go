@@ -292,10 +292,11 @@ var _ = Describe("TaskStep", func() {
 			})
 
 			Context("when running times out", func() {
+				failure := fmt.Errorf("wrapped: %w", context.DeadlineExceeded)
 				BeforeEach(func() {
 					fakeClient.RunTaskStepReturns(
 						worker.TaskResult{},
-						fmt.Errorf("wrapped: %w", context.DeadlineExceeded),
+						failure,
 					)
 				})
 
@@ -304,10 +305,10 @@ var _ = Describe("TaskStep", func() {
 					Expect(stepErr).To(BeNil())
 				})
 
-				It("emits an Errored event", func() {
+				It("errors the task via the delegate", func() {
 					Expect(fakeDelegate.ErroredCallCount()).To(Equal(1))
-					_, status := fakeDelegate.ErroredArgsForCall(0)
-					Expect(status).To(Equal(exec.TimeoutLogMessage))
+					_, runErr, _, _ := fakeDelegate.ErroredArgsForCall(0)
+					Expect(runErr).To(Equal(failure))
 				})
 			})
 
@@ -1068,6 +1069,12 @@ var _ = Describe("TaskStep", func() {
 				fakeClient.RunTaskStepReturns(taskResult, disaster)
 			})
 
+			It("errors the task via the delegate", func() {
+				Expect(fakeDelegate.ErroredCallCount()).To(Equal(1))
+				_, status, _, _ := fakeDelegate.ErroredArgsForCall(0)
+				Expect(status).To(Equal(disaster))
+			})
+
 			It("returns the error", func() {
 				Expect(stepErr).To(Equal(disaster))
 			})
@@ -1085,6 +1092,12 @@ var _ = Describe("TaskStep", func() {
 						VolumeMounts: []worker.VolumeMount{},
 					}, context.Canceled)
 				cancel()
+			})
+
+			It("errors the task via the delegate", func() {
+				Expect(fakeDelegate.ErroredCallCount()).To(Equal(1))
+				_, status, _, _ := fakeDelegate.ErroredArgsForCall(0)
+				Expect(status).To(Equal(context.Canceled))
 			})
 
 			It("returns the context.Canceled error", func() {

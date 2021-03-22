@@ -36,6 +36,7 @@ func NewTaskDelegate(
 	return &taskDelegate{
 		BuildStepDelegate: NewBuildStepDelegate(build, planID, state, clock, policyChecker, artifactSourcer),
 
+		planID:      planID,
 		eventOrigin: event.Origin{ID: event.OriginID(planID)},
 		build:       build,
 		clock:       clock,
@@ -48,6 +49,7 @@ func NewTaskDelegate(
 type taskDelegate struct {
 	exec.BuildStepDelegate
 
+	planID      atc.PlanID
 	config      atc.TaskConfig
 	build       db.Build
 	eventOrigin event.Origin
@@ -284,6 +286,33 @@ func (d *taskDelegate) Starting(logger lager.Logger) {
 	}
 
 	logger.Debug("starting")
+}
+
+func (d *taskDelegate) Errored(
+	logger lager.Logger,
+	runErr error,
+	strategy worker.ContainerPlacementStrategy,
+	chosenWorker worker.Client,
+) {
+	if strategy.ModifiesActiveTasks() {
+		if err := d.decreaseActiveTasks(chosenWorker); err != nil {
+			logger.Error("failed-to-decrease-active-tasks", err)
+		}
+	}
+
+	if errors.Is(runErr, context.DeadlineExceeded) {
+		err := d.build.SaveEvent(event.Error{
+			Message: exec.TimeoutLogMessage,
+			Origin: event.Origin{
+				ID: event.OriginID(d.planID),
+			},
+			Time: d.clock.Now().Unix(),
+		})
+
+		if err != nil {
+			logger.Error("failed-to-save-error-event", err)
+		}
+	}
 }
 
 func (d *taskDelegate) Finished(
