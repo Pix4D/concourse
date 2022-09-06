@@ -9,7 +9,7 @@
     "color": "^4.0.1",
     "puppeteer": "^10.2.0",
     "tmp-promise": "^3.0.2",
-    "uuid": "^8.3.2"
+    "uuid": "^9.0.0"
   },
   "devDependencies": {},
   "scripts": {
