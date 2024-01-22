@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"code.cloudfoundry.org/lager/lagerctx"
+	"code.cloudfoundry.org/lager/v3/lagerctx"
 
 	"github.com/concourse/concourse/atc/api/accessor"
 	"github.com/concourse/concourse/atc/api/present"
@@ -21,7 +21,7 @@ func (s *Server) CreateJobBuild(pipeline db.Pipeline) http.Handler {
 
 		job, found, err := pipeline.Job(jobName)
 		if err != nil {
-			logger.Error("failed-to-get-resource-types", err)
+			logger.Error("failed-to-get-job", err)
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
