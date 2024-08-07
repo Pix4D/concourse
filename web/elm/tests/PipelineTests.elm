@@ -354,7 +354,7 @@ all =
                                 >> Query.has
                                     [ style "background-image" <|
                                         Assets.backgroundImage <|
-                                            Just (Assets.CliIcon Windows)
+                                            Just (Assets.CliIcon OSXArm)
                                     , style "background-position" "50% 50%"
                                     , style "background-repeat" "no-repeat"
                                     , style "width" "12px"
@@ -363,6 +363,18 @@ all =
                                     , attribute <| Attr.download ""
                                     ]
                             , Query.index 2
+                                >> Query.has
+                                    [ style "background-image" <|
+                                        Assets.backgroundImage <|
+                                            Just (Assets.CliIcon Windows)
+                                    , style "background-position" "50% 50%"
+                                    , style "background-repeat" "no-repeat"
+                                    , style "width" "12px"
+                                    , style "height" "12px"
+                                    , style "display" "inline-block"
+                                    , attribute <| Attr.download ""
+                                    ]
+                            , Query.index 3
                                 >> Query.has
                                     [ style "background-image" <|
                                         Assets.backgroundImage <|
