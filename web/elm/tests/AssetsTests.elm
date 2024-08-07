@@ -24,6 +24,11 @@ toStringTests =
                     CliIcon OSX
                         |> toString
                         |> Expect.equal "/public/images/apple-logo.svg"
+            , test "OSXArm" <|
+                \_ ->
+                    CliIcon OSXArm
+                        |> toString
+                        |> Expect.equal "/public/images/apple-arm-logo.svg"
             , test "Windows" <|
                 \_ ->
                     CliIcon Windows

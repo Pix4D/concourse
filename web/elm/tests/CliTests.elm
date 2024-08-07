@@ -13,6 +13,7 @@ all =
                 List.map downloadUrl clis
                     |> Expect.equal
                         [ "/api/v1/cli?arch=amd64&platform=darwin"
+                        , "/api/v1/cli?arch=arm&platform=darwin"
                         , "/api/v1/cli?arch=amd64&platform=windows"
                         , "/api/v1/cli?arch=amd64&platform=linux"
                         ]
@@ -21,6 +22,7 @@ all =
                 List.map label clis
                     |> Expect.equal
                         [ "Download OS X CLI"
+                        , "Download OS X arm CLI"
                         , "Download Windows CLI"
                         , "Download Linux CLI"
                         ]

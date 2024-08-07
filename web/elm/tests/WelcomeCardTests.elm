@@ -224,7 +224,7 @@ hasWelcomeCard setup =
                 , test "icons have descriptive ARIA labels" <|
                     cliIcons
                         >> Expect.all
-                            [ Query.count (Expect.equal 3)
+                            [ Query.count (Expect.equal 4)
                             , Query.index 0
                                 >> Query.has
                                     [ attribute <|
@@ -237,9 +237,16 @@ hasWelcomeCard setup =
                                     [ attribute <|
                                         Attr.attribute
                                             "aria-label"
-                                            "Download Windows CLI"
+                                            "Download OS X arm CLI"
                                     ]
                             , Query.index 2
+                                >> Query.has
+                                    [ attribute <|
+                                        Attr.attribute
+                                            "aria-label"
+                                            "Download Windows CLI"
+                                    ]
+                            , Query.index 3
                                 >> Query.has
                                     [ attribute <|
                                         Attr.attribute

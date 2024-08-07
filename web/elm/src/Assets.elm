@@ -114,6 +114,9 @@ toPath asset =
                         OSX ->
                             "apple"
 
+                        OSXArm ->
+                            "apple-arm"
+
                         Windows ->
                             "windows"
 

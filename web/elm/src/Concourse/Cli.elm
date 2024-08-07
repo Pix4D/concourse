@@ -6,11 +6,12 @@ import Url.Builder
 
 clis : List Cli
 clis =
-    [ OSX, Windows, Linux ]
+    [ OSX, OSXArm, Windows, Linux ]
 
 
 type Cli
     = OSX
+    | OSXArm
     | Windows
     | Linux
 
@@ -23,15 +24,26 @@ downloadUrl cli =
                 OSX ->
                     "darwin"
 
+                OSXArm ->
+                    "darwin"
+
                 Windows ->
                     "windows"
 
                 Linux ->
                     "linux"
+
+        archName =
+            case cli of
+                OSXArm ->
+                    "arm"
+
+                _ ->
+                    "amd64"
     in
     Endpoints.Cli
         |> Endpoints.toString
-            [ Url.Builder.string "arch" "amd64"
+            [ Url.Builder.string "arch" archName
             , Url.Builder.string "platform" platformName
             ]
 
@@ -43,6 +55,9 @@ label cli =
             case cli of
                 OSX ->
                     "OS X"
+
+                OSXArm ->
+                    "OS X arm"
 
                 Windows ->
                     "Windows"
@@ -58,6 +73,9 @@ id cli =
     case cli of
         OSX ->
             "osx"
+
+        OSXArm ->
+            "osx-arm"
 
         Windows ->
             "windows"
