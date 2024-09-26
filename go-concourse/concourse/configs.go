@@ -96,7 +96,11 @@ func (team *team) CreateOrUpdatePipelineConfig(pipelineRef atc.PipelineRef, conf
 		var validationErr atc.SaveConfigResponse
 		err = json.Unmarshal(body, &validationErr)
 		if err != nil {
-			return false, false, []ConfigWarning{}, err
+			return false, false, []ConfigWarning{}, internal.UnexpectedResponseError{
+				StatusCode: response.StatusCode,
+				Status:     response.Status,
+				Body:       string(body),
+			}
 		}
 		return false, false, []ConfigWarning{}, InvalidConfigError{Errors: validationErr.Errors}
 	case http.StatusForbidden:

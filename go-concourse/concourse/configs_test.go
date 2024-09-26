@@ -378,6 +378,7 @@ var _ = Describe("ATC Handler Configs", func() {
 				It("returns an error", func() {
 					_, _, _, err := team.CreateOrUpdatePipelineConfig(pipelineRef, expectedVersion, expectedConfig, checkCredentials)
 					Expect(err).To(HaveOccurred())
+					Expect(err.Error()).To(ContainSubstring("bad-json"))
 				})
 			})
 		})
