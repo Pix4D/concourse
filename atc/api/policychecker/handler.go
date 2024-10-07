@@ -3,11 +3,11 @@ package policychecker
 import (
 	"fmt"
 	"net/http"
+	"strings"
 
 	"code.cloudfoundry.org/lager/v3"
 
 	"github.com/concourse/concourse/atc/api/accessor"
-	"github.com/concourse/concourse/atc/policy"
 )
 
 func NewHandler(
@@ -42,15 +42,13 @@ func (h policyCheckingHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 	}
 
 	if !result.Allowed() {
-		policyCheckErr := policy.PolicyCheckNotPass{
-			Messages: result.Messages(),
-		}
+		policyCheckErr := fmt.Sprintf("policy check failed: %s", strings.Join(result.Messages(), "\n * "))
 		if result.ShouldBlock() {
 			w.WriteHeader(http.StatusForbidden)
-			fmt.Fprint(w, policyCheckErr.Error())
+			fmt.Fprint(w, policyCheckErr)
 			return
 		} else {
-			w.Header().Add("X-Concourse-Policy-Check-Warning", policyCheckErr.Error())
+			w.Header().Add("X-Concourse-Policy-Check-Warning", policyCheckErr)
 		}
 	}
 

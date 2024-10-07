@@ -13,19 +13,6 @@ import (
 const ActionUseImage = "UseImage"
 const ActionRunSetPipeline = "SetPipeline"
 
-type PolicyCheckNotPass struct {
-	Messages []string
-}
-
-func (e PolicyCheckNotPass) Error() string {
-	if len(e.Messages) == 0 {
-		return "policy check failed"
-	}
-	lines := []string{""}
-	lines = append(lines, e.Messages...)
-	return fmt.Sprintf("policy check failed: %s", strings.Join(lines, "\n * "))
-}
-
 type Filter struct {
 	HttpMethods   []string `long:"policy-check-filter-http-method" description:"API http method to go through policy check"`
 	Actions       []string `long:"policy-check-filter-action" description:"Actions in the list will go through policy check"`
