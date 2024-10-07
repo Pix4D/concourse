@@ -59,8 +59,7 @@ func (r internalPolicyCheckResult) Messages() []string {
 // PassedPolicyCheck creates a generic passed check
 func PassedPolicyCheck() PolicyCheckResult {
 	return internalPolicyCheckResult{
-		allowed:  true,
-		messages: []string{""},
+		allowed: true,
 	}
 }
 
