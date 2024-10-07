@@ -45,14 +45,14 @@ func (c opa) Check(input policy.PolicyCheckInput) (policy.PolicyCheckResult, err
 	data := opaInput{input}
 	jsonBytes, err := json.Marshal(data)
 	if err != nil {
-		return nil, err
+		return policy.PolicyCheckResult{}, err
 	}
 
 	c.logger.Debug("opa-check", lager.Data{"input": string(jsonBytes)})
 
 	req, err := http.NewRequest("POST", c.config.URL, bytes.NewBuffer(jsonBytes))
 	if err != nil {
-		return nil, err
+		return policy.PolicyCheckResult{}, err
 	}
 	req.Header.Set("Content-Type", "application/json")
 
@@ -60,23 +60,23 @@ func (c opa) Check(input policy.PolicyCheckInput) (policy.PolicyCheckResult, err
 	client.Timeout = c.config.Timeout
 	resp, err := client.Do(req)
 	if err != nil {
-		return nil, err
+		return policy.PolicyCheckResult{}, err
 	}
 	defer resp.Body.Close()
 
 	statusCode := resp.StatusCode
 	if statusCode != http.StatusOK {
-		return nil, fmt.Errorf("opa returned status: %d", statusCode)
+		return policy.PolicyCheckResult{}, fmt.Errorf("opa returned status: %d", statusCode)
 	}
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("opa returned no response: %s", err.Error())
+		return policy.PolicyCheckResult{}, fmt.Errorf("opa returned no response: %s", err.Error())
 	}
 
 	result, err := ParseOpaResult(body, c.config)
 	if err != nil {
-		return nil, fmt.Errorf("parsing opa results: %w", err)
+		return policy.PolicyCheckResult{}, fmt.Errorf("parsing opa results: %w", err)
 	}
 
 	return result, nil

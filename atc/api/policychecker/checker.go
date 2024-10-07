@@ -59,7 +59,7 @@ func (c *checker) Check(action string, acc accessor.Access, req *http.Request) (
 	case "application/json", "text/vnd.yaml", "text/yaml", "text/x-yaml", "application/x-yaml":
 		body, err := io.ReadAll(req.Body)
 		if err != nil {
-			return nil, err
+			return policy.PolicyCheckResult{}, err
 		} else if len(body) > 0 {
 			if ct == "application/json" {
 				err = json.Unmarshal(body, &input.Data)
@@ -67,7 +67,7 @@ func (c *checker) Check(action string, acc accessor.Access, req *http.Request) (
 				err = yaml.Unmarshal(body, &input.Data)
 			}
 			if err != nil {
-				return nil, err
+				return policy.PolicyCheckResult{}, err
 			}
 
 			req.Body = io.NopCloser(bytes.NewBuffer(body))

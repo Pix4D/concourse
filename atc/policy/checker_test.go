@@ -10,10 +10,9 @@ import (
 
 var _ = Describe("Policy checker", func() {
 	var (
-		checker    policy.Checker
-		filter     policy.Filter
-		err        error
-		fakeResult *policyfakes.FakePolicyCheckResult
+		checker policy.Checker
+		filter  policy.Filter
+		err     error
 	)
 
 	BeforeEach(func() {
@@ -23,10 +22,8 @@ var _ = Describe("Policy checker", func() {
 			ActionsToSkip: []string{"skip_1", "skip_2"},
 		}
 
-		fakeResult = new(policyfakes.FakePolicyCheckResult)
 		fakeAgent = new(policyfakes.FakeAgent)
-		fakeAgent.CheckReturns(fakeResult, nil)
-
+		fakeAgent.CheckReturns(policy.PassedPolicyCheck(), nil)
 		fakeAgentFactory.NewAgentReturns(fakeAgent, nil)
 	})
 
@@ -103,7 +100,7 @@ var _ = Describe("Policy checker", func() {
 
 				It("return the same result the agent returns", func() {
 					Expect(checkErr).ToNot(HaveOccurred())
-					Expect(output).To(Equal(fakeResult))
+					Expect(output).To(Equal(policy.PassedPolicyCheck()))
 				})
 			})
 		})

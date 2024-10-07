@@ -22,11 +22,10 @@ import (
 
 var _ = Describe("SetPipelineStepDelegate", func() {
 	var (
-		logger                *lagertest.TestLogger
-		fakeBuild             *dbfakes.FakeBuild
-		fakeClock             *fakeclock.FakeClock
-		fakePolicyChecker     *policyfakes.FakeChecker
-		fakePolicyCheckResult *policyfakes.FakePolicyCheckResult
+		logger            *lagertest.TestLogger
+		fakeBuild         *dbfakes.FakeBuild
+		fakeClock         *fakeclock.FakeClock
+		fakePolicyChecker *policyfakes.FakeChecker
 
 		state exec.RunState
 
@@ -47,9 +46,7 @@ var _ = Describe("SetPipelineStepDelegate", func() {
 		}
 		state = exec.NewRunState(noopStepper, credVars, true)
 
-		fakePolicyCheckResult = new(policyfakes.FakePolicyCheckResult)
 		fakePolicyChecker = new(policyfakes.FakeChecker)
-		fakePolicyChecker.CheckReturns(fakePolicyCheckResult, nil)
 
 		delegate = engine.NewSetPipelineStepDelegate(fakeBuild, "some-plan-id", state, fakeClock, fakePolicyChecker)
 	})
@@ -119,7 +116,7 @@ var _ = Describe("SetPipelineStepDelegate", func() {
 
 			Context("when policy check fails", func() {
 				BeforeEach(func() {
-					fakePolicyChecker.CheckReturns(nil, errors.New("some-error"))
+					fakePolicyChecker.CheckReturns(policy.PolicyCheckResult{}, errors.New("some-error"))
 				})
 
 				It("should fail", func() {
@@ -129,14 +126,16 @@ var _ = Describe("SetPipelineStepDelegate", func() {
 			})
 
 			Context("when policy check not pass", func() {
-				BeforeEach(func() {
-					fakePolicyCheckResult.AllowedReturns(false)
-					fakePolicyCheckResult.MessagesReturns([]string{"reasonA", "reasonB"})
-				})
-
 				Context("when should block", func() {
 					BeforeEach(func() {
-						fakePolicyCheckResult.ShouldBlockReturns(true)
+						fakePolicyChecker.CheckReturns(
+							policy.PolicyCheckResult{
+								Allowed:     false,
+								ShouldBlock: true,
+								Messages:    []string{"reasonA", "reasonB"},
+							},
+							nil,
+						)
 					})
 
 					It("should fail", func() {
@@ -149,7 +148,14 @@ var _ = Describe("SetPipelineStepDelegate", func() {
 
 				Context("when should not block", func() {
 					BeforeEach(func() {
-						fakePolicyCheckResult.ShouldBlockReturns(false)
+						fakePolicyChecker.CheckReturns(
+							policy.PolicyCheckResult{
+								Allowed:     false,
+								ShouldBlock: false,
+								Messages:    []string{"reasonA", "reasonB"},
+							},
+							nil,
+						)
 					})
 
 					It("should succeed", func() {
@@ -180,7 +186,7 @@ var _ = Describe("SetPipelineStepDelegate", func() {
 
 			Context("policy check passes", func() {
 				BeforeEach(func() {
-					fakePolicyCheckResult.AllowedReturns(true)
+					fakePolicyChecker.CheckReturns(policy.PassedPolicyCheck(), nil)
 				})
 
 				It("should succeed", func() {

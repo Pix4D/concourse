@@ -41,9 +41,9 @@ func (h policyCheckingHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	if !result.Allowed() {
-		policyCheckErr := fmt.Sprintf("policy check failed: %s", strings.Join(result.Messages(), "\n * "))
-		if result.ShouldBlock() {
+	if !result.Allowed {
+		policyCheckErr := fmt.Sprintf("policy check failed: %s", strings.Join(result.Messages, "\n * "))
+		if result.ShouldBlock {
 			w.WriteHeader(http.StatusForbidden)
 			fmt.Fprint(w, policyCheckErr)
 			return

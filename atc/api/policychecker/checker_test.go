@@ -19,19 +19,16 @@ import (
 
 var _ = Describe("PolicyChecker", func() {
 	var (
-		policyFilter          policy.Filter
-		fakeAccess            *accessorfakes.FakeAccess
-		fakeRequest           *http.Request
-		result                policy.PolicyCheckResult
-		checkErr              error
-		fakePolicyCheckResult *policyfakes.FakePolicyCheckResult
+		policyFilter policy.Filter
+		fakeAccess   *accessorfakes.FakeAccess
+		fakeRequest  *http.Request
+		result       policy.PolicyCheckResult
+		checkErr     error
 	)
 
 	BeforeEach(func() {
 		fakeAccess = new(accessorfakes.FakeAccess)
-		fakePolicyCheckResult = new(policyfakes.FakePolicyCheckResult)
 		fakePolicyAgent = new(policyfakes.FakeAgent)
-		fakePolicyAgent.CheckReturns(fakePolicyCheckResult, nil)
 		fakePolicyAgentFactory.NewAgentReturns(fakePolicyAgent, nil)
 
 		policyFilter = policy.Filter{
@@ -54,7 +51,7 @@ var _ = Describe("PolicyChecker", func() {
 		})
 		It("should pass", func() {
 			Expect(checkErr).ToNot(HaveOccurred())
-			Expect(result.Allowed()).To(BeTrue())
+			Expect(result.Allowed).To(BeTrue())
 		})
 		It("Agent should not be called", func() {
 			Expect(fakePolicyAgent.CheckCallCount()).To(Equal(0))
@@ -72,7 +69,7 @@ var _ = Describe("PolicyChecker", func() {
 			})
 			It("should pass", func() {
 				Expect(checkErr).ToNot(HaveOccurred())
-				Expect(result.Allowed()).To(BeTrue())
+				Expect(result.Allowed).To(BeTrue())
 			})
 			It("Agent should not be called", func() {
 				Expect(fakePolicyAgent.CheckCallCount()).To(Equal(0))
@@ -86,7 +83,7 @@ var _ = Describe("PolicyChecker", func() {
 			})
 			It("should pass", func() {
 				Expect(checkErr).ToNot(HaveOccurred())
-				Expect(result.Allowed()).To(BeTrue())
+				Expect(result.Allowed).To(BeTrue())
 			})
 			It("Agent should not be called", func() {
 				Expect(fakePolicyAgent.CheckCallCount()).To(Equal(0))
@@ -101,7 +98,7 @@ var _ = Describe("PolicyChecker", func() {
 			})
 			It("should pass", func() {
 				Expect(checkErr).ToNot(HaveOccurred())
-				Expect(result.Allowed()).To(BeTrue())
+				Expect(result.Allowed).To(BeTrue())
 			})
 			It("Agent should not be called", func() {
 				Expect(fakePolicyAgent.CheckCallCount()).To(Equal(0))
@@ -124,7 +121,7 @@ var _ = Describe("PolicyChecker", func() {
 				It("should error", func() {
 					Expect(checkErr).To(HaveOccurred())
 					Expect(checkErr.Error()).To(Equal(`invalid character 'h' looking for beginning of value`))
-					Expect(result).To(BeNil())
+					Expect(result).To(Equal(policy.PolicyCheckResult{}))
 				})
 				It("Agent should not be called", func() {
 					Expect(fakePolicyAgent.CheckCallCount()).To(Equal(0))
@@ -141,7 +138,7 @@ var _ = Describe("PolicyChecker", func() {
 				It("should error", func() {
 					Expect(checkErr).To(HaveOccurred())
 					Expect(checkErr.Error()).To(Equal(`error converting YAML to JSON: yaml: line 3: could not find expected ':'`))
-					Expect(result).To(BeNil())
+					Expect(result).To(Equal(policy.PolicyCheckResult{}))
 				})
 
 				It("Agent should not be called", func() {
@@ -197,34 +194,39 @@ var _ = Describe("PolicyChecker", func() {
 
 					It("it should pass", func() {
 						Expect(checkErr).ToNot(HaveOccurred())
-						Expect(result.Allowed()).To(BeTrue())
+						Expect(result.Allowed).To(BeTrue())
 					})
 				})
 
 				Context("when Agent says not-pass", func() {
 					BeforeEach(func() {
-						fakePolicyCheckResult.AllowedReturns(false)
-						fakePolicyCheckResult.ShouldBlockReturns(true)
-						fakePolicyCheckResult.MessagesReturns([]string{"a policy says you can't do that"})
+						fakePolicyAgent.CheckReturns(
+							policy.PolicyCheckResult{
+								Allowed:     false,
+								ShouldBlock: true,
+								Messages:    []string{"a policy says you can't do that"},
+							},
+							nil,
+						)
 					})
 
 					It("should not pass", func() {
 						Expect(checkErr).ToNot(HaveOccurred())
-						Expect(result.Allowed()).To(BeFalse())
-						Expect(result.ShouldBlock()).To(BeTrue())
-						Expect(result.Messages()).To(ConsistOf("a policy says you can't do that"))
+						Expect(result.Allowed).To(BeFalse())
+						Expect(result.ShouldBlock).To(BeTrue())
+						Expect(result.Messages).To(ConsistOf("a policy says you can't do that"))
 					})
 				})
 
 				Context("when Agent says error", func() {
 					BeforeEach(func() {
-						fakePolicyAgent.CheckReturns(nil, errors.New("some-error"))
+						fakePolicyAgent.CheckReturns(policy.PolicyCheckResult{}, errors.New("some-error"))
 					})
 
 					It("should not pass", func() {
 						Expect(checkErr).To(HaveOccurred())
 						Expect(checkErr.Error()).To(Equal("some-error"))
-						Expect(result).To(BeNil())
+						Expect(result).To(Equal(policy.PolicyCheckResult{}))
 					})
 				})
 			})

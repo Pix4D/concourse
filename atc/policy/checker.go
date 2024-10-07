@@ -32,34 +32,16 @@ type PolicyCheckInput struct {
 	Data           interface{} `json:"data,omitempty"`
 }
 
-//counterfeiter:generate . PolicyCheckResult
-type PolicyCheckResult interface {
-	Allowed() bool
-	ShouldBlock() bool
-	Messages() []string
-}
-
-type internalPolicyCheckResult struct {
-	allowed  bool
-	messages []string
-}
-
-func (r internalPolicyCheckResult) Allowed() bool {
-	return r.allowed
-}
-
-func (r internalPolicyCheckResult) ShouldBlock() bool {
-	return !r.allowed
-}
-
-func (r internalPolicyCheckResult) Messages() []string {
-	return r.messages
+type PolicyCheckResult struct {
+	Allowed     bool
+	ShouldBlock bool
+	Messages    []string
 }
 
 // PassedPolicyCheck creates a generic passed check
 func PassedPolicyCheck() PolicyCheckResult {
-	return internalPolicyCheckResult{
-		allowed: true,
+	return PolicyCheckResult{
+		Allowed: true,
 	}
 }
 

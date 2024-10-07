@@ -11,7 +11,6 @@ import (
 	"github.com/concourse/concourse/atc/api/policychecker"
 	"github.com/concourse/concourse/atc/api/policychecker/policycheckerfakes"
 	"github.com/concourse/concourse/atc/policy"
-	"github.com/concourse/concourse/atc/policy/policyfakes"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -19,20 +18,18 @@ import (
 
 var _ = Describe("Handler", func() {
 	var (
-		innerHandlerCalled    bool
-		dummyHandler          http.HandlerFunc
-		policyCheckerHandler  http.Handler
-		req                   *http.Request
-		fakePolicyChecker     *policycheckerfakes.FakePolicyChecker
-		fakePolicyCheckResult *policyfakes.FakePolicyCheckResult
-		responseWriter        *httptest.ResponseRecorder
+		innerHandlerCalled   bool
+		dummyHandler         http.HandlerFunc
+		policyCheckerHandler http.Handler
+		req                  *http.Request
+		fakePolicyChecker    *policycheckerfakes.FakePolicyChecker
+		responseWriter       *httptest.ResponseRecorder
 
 		logger = lagertest.NewTestLogger("test")
 	)
 
 	BeforeEach(func() {
 		fakePolicyChecker = new(policycheckerfakes.FakePolicyChecker)
-		fakePolicyCheckResult = new(policyfakes.FakePolicyCheckResult)
 
 		innerHandlerCalled = false
 		dummyHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -65,15 +62,14 @@ var _ = Describe("Handler", func() {
 	})
 
 	Context("policy check doesn't pass", func() {
-		BeforeEach(func() {
-			fakePolicyCheckResult.AllowedReturns(false)
-			fakePolicyCheckResult.MessagesReturns([]string{"a policy says you can't do that", "another policy also says you can't do that"})
-			fakePolicyChecker.CheckReturns(fakePolicyCheckResult, nil)
-		})
-
 		Context("when should block", func() {
 			BeforeEach(func() {
-				fakePolicyCheckResult.ShouldBlockReturns(true)
+				fakePolicyCheckResult := policy.PolicyCheckResult{
+					Allowed:     false,
+					ShouldBlock: true,
+					Messages:    []string{"a policy says you can't do that", "another policy also says you can't do that"},
+				}
+				fakePolicyChecker.CheckReturns(fakePolicyCheckResult, nil)
 			})
 
 			It("return http forbidden", func() {
@@ -92,7 +88,12 @@ var _ = Describe("Handler", func() {
 
 		Context("when should not block", func() {
 			BeforeEach(func() {
-				fakePolicyCheckResult.ShouldBlockReturns(false)
+				fakePolicyCheckResult := policy.PolicyCheckResult{
+					Allowed:     false,
+					ShouldBlock: false,
+					Messages:    []string{"a policy says you can't do that", "another policy also says you can't do that"},
+				}
+				fakePolicyChecker.CheckReturns(fakePolicyCheckResult, nil)
 			})
 
 			It("calls the inner handler", func() {
@@ -109,7 +110,7 @@ var _ = Describe("Handler", func() {
 
 	Context("policy check errors", func() {
 		BeforeEach(func() {
-			fakePolicyChecker.CheckReturns(nil, errors.New("some-error"))
+			fakePolicyChecker.CheckReturns(policy.PolicyCheckResult{}, errors.New("some-error"))
 		})
 
 		It("return http bad request", func() {

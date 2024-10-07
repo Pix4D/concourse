@@ -240,10 +240,7 @@ var _ = Describe("BuildStepDelegate", func() {
 			})
 
 			Context("when the action needs to be checked", func() {
-				var fakeCheckResult *policyfakes.FakePolicyCheckResult
 				BeforeEach(func() {
-					fakeCheckResult = new(policyfakes.FakePolicyCheckResult)
-					fakePolicyChecker.CheckReturns(fakeCheckResult, nil)
 					fakePolicyChecker.ShouldCheckActionReturns(true)
 				})
 
@@ -253,7 +250,7 @@ var _ = Describe("BuildStepDelegate", func() {
 
 				Context("when the check fails", func() {
 					BeforeEach(func() {
-						fakePolicyChecker.CheckReturns(nil, errors.New("some-error"))
+						fakePolicyChecker.CheckReturns(policy.PolicyCheckResult{}, errors.New("some-error"))
 					})
 
 					It("should fail", func() {
@@ -264,9 +261,14 @@ var _ = Describe("BuildStepDelegate", func() {
 
 				Context("when the check is not allowed", func() {
 					BeforeEach(func() {
-						fakeCheckResult.AllowedReturns(false)
-						fakeCheckResult.ShouldBlockReturns(true)
-						fakeCheckResult.MessagesReturns([]string{"reasonA", "reasonB"})
+						fakePolicyChecker.CheckReturns(
+							policy.PolicyCheckResult{
+								Allowed:     false,
+								ShouldBlock: true,
+								Messages:    []string{"reasonA", "reasonB"},
+							},
+							nil,
+						)
 					})
 
 					It("should fail", func() {
@@ -281,9 +283,14 @@ var _ = Describe("BuildStepDelegate", func() {
 				// thus this case only verifies policy check warning messages.
 				Context("when the check is not allowed but non-block", func() {
 					BeforeEach(func() {
-						fakeCheckResult.AllowedReturns(false)
-						fakeCheckResult.ShouldBlockReturns(false)
-						fakeCheckResult.MessagesReturns([]string{"reasonA", "reasonB"})
+						fakePolicyChecker.CheckReturns(
+							policy.PolicyCheckResult{
+								Allowed:     false,
+								ShouldBlock: false,
+								Messages:    []string{"reasonA", "reasonB"},
+							},
+							nil,
+						)
 					})
 
 					It("succeeds", func() {
@@ -313,7 +320,7 @@ var _ = Describe("BuildStepDelegate", func() {
 
 				Context("when the check is allowed", func() {
 					BeforeEach(func() {
-						fakeCheckResult.AllowedReturns(true)
+						fakePolicyChecker.CheckReturns(policy.PassedPolicyCheck(), nil)
 					})
 
 					It("succeeds", func() {

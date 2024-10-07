@@ -52,7 +52,7 @@ var _ = Describe("OPA Policy Checker", func() {
 		It("should return an error", func() {
 			result, err := agent.Check(policy.PolicyCheckInput{})
 			Expect(err).To(MatchError(ContainSubstring("allowed: key 'result.allowed' not found")))
-			Expect(result).To(BeNil())
+			Expect(result).To(Equal(policy.PolicyCheckResult{}))
 		})
 	})
 
@@ -66,7 +66,7 @@ var _ = Describe("OPA Policy Checker", func() {
 		It("should return an error", func() {
 			result, err := agent.Check(policy.PolicyCheckInput{})
 			Expect(err).To(MatchError(ContainSubstring("allowed: missing field 'allowed' in var: result.allowed")))
-			Expect(result).To(BeNil())
+			Expect(result).To(Equal(policy.PolicyCheckResult{}))
 		})
 	})
 
@@ -80,7 +80,7 @@ var _ = Describe("OPA Policy Checker", func() {
 		It("should return an error", func() {
 			result, err := agent.Check(policy.PolicyCheckInput{})
 			Expect(err).To(MatchError(ContainSubstring("allowed: missing field 'allowed' in var: result.allowed")))
-			Expect(result).To(BeNil())
+			Expect(result).To(Equal(policy.PolicyCheckResult{}))
 		})
 	})
 
@@ -94,9 +94,9 @@ var _ = Describe("OPA Policy Checker", func() {
 		It("should be allowed", func() {
 			result, err := agent.Check(policy.PolicyCheckInput{})
 			Expect(err).ToNot(HaveOccurred())
-			Expect(result.Allowed()).To(BeTrue())
-			Expect(result.ShouldBlock()).To(BeFalse())
-			Expect(result.Messages()).To(BeEmpty())
+			Expect(result.Allowed).To(BeTrue())
+			Expect(result.ShouldBlock).To(BeFalse())
+			Expect(result.Messages).To(BeEmpty())
 		})
 	})
 
@@ -110,9 +110,9 @@ var _ = Describe("OPA Policy Checker", func() {
 		It("should not be allowed", func() {
 			result, err := agent.Check(policy.PolicyCheckInput{})
 			Expect(err).ToNot(HaveOccurred())
-			Expect(result.Allowed()).To(BeFalse())
-			Expect(result.ShouldBlock()).To(BeTrue())
-			Expect(result.Messages()).To(BeEmpty())
+			Expect(result.Allowed).To(BeFalse())
+			Expect(result.ShouldBlock).To(BeTrue())
+			Expect(result.Messages).To(BeEmpty())
 		})
 	})
 
@@ -126,9 +126,9 @@ var _ = Describe("OPA Policy Checker", func() {
 		It("should not be allowed", func() {
 			result, err := agent.Check(policy.PolicyCheckInput{})
 			Expect(err).ToNot(HaveOccurred())
-			Expect(result.Allowed()).To(BeFalse())
-			Expect(result.ShouldBlock()).To(BeTrue())
-			Expect(result.Messages()).To(BeEmpty())
+			Expect(result.Allowed).To(BeFalse())
+			Expect(result.ShouldBlock).To(BeTrue())
+			Expect(result.Messages).To(BeEmpty())
 		})
 	})
 
@@ -142,9 +142,9 @@ var _ = Describe("OPA Policy Checker", func() {
 		It("should not be allowed", func() {
 			result, err := agent.Check(policy.PolicyCheckInput{})
 			Expect(err).ToNot(HaveOccurred())
-			Expect(result.Allowed()).To(BeFalse())
-			Expect(result.ShouldBlock()).To(BeFalse())
-			Expect(result.Messages()).To(BeEmpty())
+			Expect(result.Allowed).To(BeFalse())
+			Expect(result.ShouldBlock).To(BeFalse())
+			Expect(result.Messages).To(BeEmpty())
 		})
 	})
 
@@ -158,9 +158,9 @@ var _ = Describe("OPA Policy Checker", func() {
 		It("should not be allowed and return reasons", func() {
 			result, err := agent.Check(policy.PolicyCheckInput{})
 			Expect(err).ToNot(HaveOccurred())
-			Expect(result.Allowed()).To(BeFalse())
-			Expect(result.ShouldBlock()).To(BeTrue())
-			Expect(result.Messages()).To(ConsistOf("a policy says you can't do that"))
+			Expect(result.Allowed).To(BeFalse())
+			Expect(result.ShouldBlock).To(BeTrue())
+			Expect(result.Messages).To(ConsistOf("a policy says you can't do that"))
 		})
 	})
 
@@ -178,7 +178,7 @@ var _ = Describe("OPA Policy Checker", func() {
 			result, err := agent.Check(policy.PolicyCheckInput{})
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(MatchRegexp("connection refused"))
-			Expect(result).To(BeNil())
+			Expect(result).To(Equal(policy.PolicyCheckResult{}))
 		})
 	})
 
@@ -191,7 +191,7 @@ var _ = Describe("OPA Policy Checker", func() {
 			result, err := agent.Check(policy.PolicyCheckInput{})
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(Equal("opa returned status: 404"))
-			Expect(result).To(BeNil())
+			Expect(result).To(Equal(policy.PolicyCheckResult{}))
 		})
 	})
 
@@ -206,7 +206,7 @@ var _ = Describe("OPA Policy Checker", func() {
 			result, err := agent.Check(policy.PolicyCheckInput{})
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("invalid character 'h' looking for beginning of value"))
-			Expect(result).To(BeNil())
+			Expect(result).To(Equal(policy.PolicyCheckResult{}))
 		})
 	})
 })

@@ -55,9 +55,9 @@ var _ = Describe("OPA Result", func() {
 					ResultAllowedKey: "a.b",
 				})
 				Expect(err).ToNot(HaveOccurred())
-				Expect(result.Allowed()).To(BeTrue())
-				Expect(result.ShouldBlock()).To((BeFalse()))
-				Expect(result.Messages()).To(BeEmpty())
+				Expect(result.Allowed).To(BeTrue())
+				Expect(result.ShouldBlock).To((BeFalse()))
+				Expect(result.Messages).To(BeEmpty())
 			})
 		})
 
@@ -67,9 +67,9 @@ var _ = Describe("OPA Result", func() {
 					ResultAllowedKey: "a.b",
 				})
 				Expect(err).ToNot(HaveOccurred())
-				Expect(result.Allowed()).To(BeFalse())
-				Expect(result.ShouldBlock()).To((BeTrue()))
-				Expect(result.Messages()).To(BeEmpty())
+				Expect(result.Allowed).To(BeFalse())
+				Expect(result.ShouldBlock).To((BeTrue()))
+				Expect(result.Messages).To(BeEmpty())
 			})
 		})
 
@@ -80,9 +80,9 @@ var _ = Describe("OPA Result", func() {
 					ResultShouldBlockKey: "a.c",
 				})
 				Expect(err).ToNot(HaveOccurred())
-				Expect(result.Allowed()).To(BeTrue())
-				Expect(result.ShouldBlock()).To((BeTrue()))
-				Expect(result.Messages()).To(BeEmpty())
+				Expect(result.Allowed).To(BeTrue())
+				Expect(result.ShouldBlock).To((BeTrue()))
+				Expect(result.Messages).To(BeEmpty())
 			})
 		})
 
@@ -94,9 +94,9 @@ var _ = Describe("OPA Result", func() {
 					ResultMessagesKey:    "a.d",
 				})
 				Expect(err).ToNot(HaveOccurred())
-				Expect(result.Allowed()).To(BeTrue())
-				Expect(result.ShouldBlock()).To((BeTrue()))
-				Expect(result.Messages()).To(Equal([]string{"e", "f"}))
+				Expect(result.Allowed).To(BeTrue())
+				Expect(result.ShouldBlock).To((BeTrue()))
+				Expect(result.Messages).To(Equal([]string{"e", "f"}))
 			})
 		})
 	})
