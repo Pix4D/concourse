@@ -31,10 +31,6 @@ func ParseOpaResult(bytesResult []byte, opaConfig OpaConfig) (policy.PolicyCheck
 		return policy.PolicyCheckResult{}, fmt.Errorf("allowed: key '%s' must have a boolean value", opaConfig.ResultAllowedKey)
 	}
 
-	if allowed {
-		return policy.PassedPolicyCheck(), nil
-	}
-
 	parts = strings.Split(opaConfig.ResultShouldBlockKey, ".")
 	v, found, err = results.Get(vars.Reference{Path: parts[0], Fields: parts[1:]})
 	if err != nil || !found {
@@ -60,5 +56,16 @@ func ParseOpaResult(bytesResult []byte, opaConfig OpaConfig) (policy.PolicyCheck
 		}
 	}
 
-	return policy.PolicyCheckResult{Allowed: allowed, ShouldBlock: shouldBlock, Messages: messages}, nil
+	if allowed {
+		return policy.PassedPolicyCheck(), nil
+	}
+
+	var reasons string
+	if len(messages) == 0 {
+		reasons = "policy check failed"
+	} else {
+		reasons = fmt.Sprintf("policy check failed:\n * %s", strings.Join(messages, "\n * "))
+	}
+
+	return policy.PolicyCheckResult{Allowed: allowed, ShouldBlock: shouldBlock, Reasons: reasons}, nil
 }

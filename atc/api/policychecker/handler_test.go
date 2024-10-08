@@ -67,7 +67,7 @@ var _ = Describe("Handler", func() {
 				fakePolicyCheckResult := policy.PolicyCheckResult{
 					Allowed:     false,
 					ShouldBlock: true,
-					Messages:    []string{"a policy says you can't do that", "another policy also says you can't do that"},
+					Reasons:     "a policy says you can't do that\n another policy also says you can't do that",
 				}
 				fakePolicyChecker.CheckReturns(fakePolicyCheckResult, nil)
 			})
@@ -91,7 +91,7 @@ var _ = Describe("Handler", func() {
 				fakePolicyCheckResult := policy.PolicyCheckResult{
 					Allowed:     false,
 					ShouldBlock: false,
-					Messages:    []string{"a policy says you can't do that", "another policy also says you can't do that"},
+					Reasons:     "a policy says you can't do that\n another policy also says you can't do that",
 				}
 				fakePolicyChecker.CheckReturns(fakePolicyCheckResult, nil)
 			})

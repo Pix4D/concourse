@@ -57,7 +57,7 @@ var _ = Describe("OPA Result", func() {
 				Expect(err).ToNot(HaveOccurred())
 				Expect(result.Allowed).To(BeTrue())
 				Expect(result.ShouldBlock).To((BeFalse()))
-				Expect(result.Messages).To(BeEmpty())
+				Expect(result.Reasons).To(BeEmpty())
 			})
 		})
 
@@ -69,7 +69,7 @@ var _ = Describe("OPA Result", func() {
 				Expect(err).ToNot(HaveOccurred())
 				Expect(result.Allowed).To(BeFalse())
 				Expect(result.ShouldBlock).To((BeTrue()))
-				Expect(result.Messages).To(BeEmpty())
+				Expect(result.Reasons).To(Equal("policy check failed"))
 			})
 		})
 
@@ -82,7 +82,7 @@ var _ = Describe("OPA Result", func() {
 				Expect(err).ToNot(HaveOccurred())
 				Expect(result.Allowed).To(BeTrue())
 				Expect(result.ShouldBlock).To((BeFalse()))
-				Expect(result.Messages).To(BeEmpty())
+				Expect(result.Reasons).To(BeEmpty())
 			})
 		})
 
@@ -96,7 +96,7 @@ var _ = Describe("OPA Result", func() {
 				Expect(err).ToNot(HaveOccurred())
 				Expect(result.Allowed).To(BeFalse())
 				Expect(result.ShouldBlock).To((BeTrue()))
-				Expect(result.Messages).To(Equal([]string{"e", "f"}))
+				Expect(result.Reasons).To(Equal("policy check failed:\n * e\n * f"))
 			})
 		})
 	})

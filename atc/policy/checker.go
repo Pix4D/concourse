@@ -35,7 +35,7 @@ type PolicyCheckInput struct {
 type PolicyCheckResult struct {
 	Allowed     bool
 	ShouldBlock bool
-	Messages    []string
+	Reasons     string
 }
 
 // PassedPolicyCheck creates a generic passed check

@@ -265,7 +265,7 @@ var _ = Describe("BuildStepDelegate", func() {
 							policy.PolicyCheckResult{
 								Allowed:     false,
 								ShouldBlock: true,
-								Messages:    []string{"reasonA", "reasonB"},
+								Reasons:     "policy check failed\nreasonA\nreasonB",
 							},
 							nil,
 						)
@@ -287,7 +287,7 @@ var _ = Describe("BuildStepDelegate", func() {
 							policy.PolicyCheckResult{
 								Allowed:     false,
 								ShouldBlock: false,
-								Messages:    []string{"reasonA", "reasonB"},
+								Reasons:     "policy check failed\nreasonA\nreasonB",
 							},
 							nil,
 						)

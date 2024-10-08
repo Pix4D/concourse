@@ -96,7 +96,7 @@ var _ = Describe("OPA Policy Checker", func() {
 			Expect(err).ToNot(HaveOccurred())
 			Expect(result.Allowed).To(BeTrue())
 			Expect(result.ShouldBlock).To(BeFalse())
-			Expect(result.Messages).To(BeEmpty())
+			Expect(result.Reasons).To(BeEmpty())
 		})
 	})
 
@@ -112,7 +112,7 @@ var _ = Describe("OPA Policy Checker", func() {
 			Expect(err).ToNot(HaveOccurred())
 			Expect(result.Allowed).To(BeFalse())
 			Expect(result.ShouldBlock).To(BeTrue())
-			Expect(result.Messages).To(BeEmpty())
+			Expect(result.Reasons).To(Equal("policy check failed"))
 		})
 	})
 
@@ -128,7 +128,7 @@ var _ = Describe("OPA Policy Checker", func() {
 			Expect(err).ToNot(HaveOccurred())
 			Expect(result.Allowed).To(BeFalse())
 			Expect(result.ShouldBlock).To(BeTrue())
-			Expect(result.Messages).To(BeEmpty())
+			Expect(result.Reasons).To(Equal("policy check failed"))
 		})
 	})
 
@@ -144,7 +144,7 @@ var _ = Describe("OPA Policy Checker", func() {
 			Expect(err).ToNot(HaveOccurred())
 			Expect(result.Allowed).To(BeFalse())
 			Expect(result.ShouldBlock).To(BeFalse())
-			Expect(result.Messages).To(BeEmpty())
+			Expect(result.Reasons).To(Equal("policy check failed"))
 		})
 	})
 
@@ -160,7 +160,7 @@ var _ = Describe("OPA Policy Checker", func() {
 			Expect(err).ToNot(HaveOccurred())
 			Expect(result.Allowed).To(BeFalse())
 			Expect(result.ShouldBlock).To(BeTrue())
-			Expect(result.Messages).To(ConsistOf("a policy says you can't do that"))
+			Expect(result.Reasons).To(ContainSubstring("a policy says you can't do that"))
 		})
 	})
 

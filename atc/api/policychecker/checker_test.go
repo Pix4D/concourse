@@ -204,7 +204,7 @@ var _ = Describe("PolicyChecker", func() {
 							policy.PolicyCheckResult{
 								Allowed:     false,
 								ShouldBlock: true,
-								Messages:    []string{"a policy says you can't do that"},
+								Reasons:     "a policy says you can't do that",
 							},
 							nil,
 						)
@@ -214,7 +214,7 @@ var _ = Describe("PolicyChecker", func() {
 						Expect(checkErr).ToNot(HaveOccurred())
 						Expect(result.Allowed).To(BeFalse())
 						Expect(result.ShouldBlock).To(BeTrue())
-						Expect(result.Messages).To(ConsistOf("a policy says you can't do that"))
+						Expect(result.Reasons).To(Equal("a policy says you can't do that"))
 					})
 				})
 

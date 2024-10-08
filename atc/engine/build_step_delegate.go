@@ -408,11 +408,10 @@ func (delegate *buildStepDelegate) checkPolicy(input policy.PolicyCheckInput) er
 	}
 
 	if !result.Allowed {
-		policyCheckErr := fmt.Sprintf("policy check failed: %s", strings.Join(result.Messages, "\n * "))
 		if result.ShouldBlock {
-			return fmt.Errorf("%s", policyCheckErr)
+			return fmt.Errorf("%s", result.Reasons)
 		} else {
-			fmt.Fprintf(delegate.Stderr(), "\x1b[1;33m%s\x1b[0m\n\n", policyCheckErr)
+			fmt.Fprintf(delegate.Stderr(), "\x1b[1;33m%s\x1b[0m\n\n", result.Reasons)
 			fmt.Fprintln(delegate.Stderr(), "\x1b[33mWARNING: unblocking from the policy check failure for soft enforcement\x1b[0m")
 		}
 	}
