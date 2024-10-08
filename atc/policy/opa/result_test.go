@@ -81,20 +81,20 @@ var _ = Describe("OPA Result", func() {
 				})
 				Expect(err).ToNot(HaveOccurred())
 				Expect(result.Allowed).To(BeTrue())
-				Expect(result.ShouldBlock).To((BeTrue()))
+				Expect(result.ShouldBlock).To((BeFalse()))
 				Expect(result.Messages).To(BeEmpty())
 			})
 		})
 
 		Context("when result string contain all keys", func() {
 			It("should succeed", func() {
-				result, err := opa.ParseOpaResult([]byte(`{"a": {"b": true, "c": true, "d": ["e", "f"]}}`), opa.OpaConfig{
+				result, err := opa.ParseOpaResult([]byte(`{"a": {"b": false, "c": true, "d": ["e", "f"]}}`), opa.OpaConfig{
 					ResultAllowedKey:     "a.b",
 					ResultShouldBlockKey: "a.c",
 					ResultMessagesKey:    "a.d",
 				})
 				Expect(err).ToNot(HaveOccurred())
-				Expect(result.Allowed).To(BeTrue())
+				Expect(result.Allowed).To(BeFalse())
 				Expect(result.ShouldBlock).To((BeTrue()))
 				Expect(result.Messages).To(Equal([]string{"e", "f"}))
 			})
