@@ -34,11 +34,20 @@ type policyCheckingHandler struct {
 func (h policyCheckingHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	acc := accessor.GetAccessor(r)
 
+	logger := h.logger.Session("policy-check-handler")
 	result, err := h.policyChecker.Check(h.action, acc, r)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		fmt.Fprintf(w, "policy check error: %s", err.Error())
+		// logged error should be meaningful to the Concourse operator/maintainer
+		logger.Error("policy-checker", err)
+		fmt.Fprintf(w, "policy checker: <meaningful-reason-for-the-(concourse-user>/client)>")
 		return
+	}
+
+	// log only if we policy check return block or warn
+	if result.Status != policy.Allow {
+		logger.Info("policy-checker", lager.Data{"result": result.Status.String(), "reason": result.Reasons})
 	}
 
 	if result.Status == policy.Block {
