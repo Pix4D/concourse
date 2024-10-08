@@ -94,8 +94,7 @@ var _ = Describe("OPA Policy Checker", func() {
 		It("should be allowed", func() {
 			result, err := agent.Check(policy.PolicyCheckInput{})
 			Expect(err).ToNot(HaveOccurred())
-			Expect(result.Allowed).To(BeTrue())
-			Expect(result.ShouldBlock).To(BeFalse())
+			Expect(result.Status).To(Equal(policy.Allow))
 			Expect(result.Reasons).To(BeEmpty())
 		})
 	})
@@ -110,8 +109,7 @@ var _ = Describe("OPA Policy Checker", func() {
 		It("should not be allowed", func() {
 			result, err := agent.Check(policy.PolicyCheckInput{})
 			Expect(err).ToNot(HaveOccurred())
-			Expect(result.Allowed).To(BeFalse())
-			Expect(result.ShouldBlock).To(BeTrue())
+			Expect(result.Status).To(Equal(policy.Block))
 			Expect(result.Reasons).To(Equal("policy check failed"))
 		})
 	})
@@ -126,8 +124,7 @@ var _ = Describe("OPA Policy Checker", func() {
 		It("should not be allowed", func() {
 			result, err := agent.Check(policy.PolicyCheckInput{})
 			Expect(err).ToNot(HaveOccurred())
-			Expect(result.Allowed).To(BeFalse())
-			Expect(result.ShouldBlock).To(BeTrue())
+			Expect(result.Status).To(Equal(policy.Block))
 			Expect(result.Reasons).To(Equal("policy check failed"))
 		})
 	})
@@ -142,8 +139,7 @@ var _ = Describe("OPA Policy Checker", func() {
 		It("should not be allowed", func() {
 			result, err := agent.Check(policy.PolicyCheckInput{})
 			Expect(err).ToNot(HaveOccurred())
-			Expect(result.Allowed).To(BeFalse())
-			Expect(result.ShouldBlock).To(BeFalse())
+			Expect(result.Status).To(Equal(policy.Warn))
 			Expect(result.Reasons).To(Equal("policy check failed"))
 		})
 	})
@@ -158,8 +154,7 @@ var _ = Describe("OPA Policy Checker", func() {
 		It("should not be allowed and return reasons", func() {
 			result, err := agent.Check(policy.PolicyCheckInput{})
 			Expect(err).ToNot(HaveOccurred())
-			Expect(result.Allowed).To(BeFalse())
-			Expect(result.ShouldBlock).To(BeTrue())
+			Expect(result.Status).To(Equal(policy.Block))
 			Expect(result.Reasons).To(ContainSubstring("a policy says you can't do that"))
 		})
 	})

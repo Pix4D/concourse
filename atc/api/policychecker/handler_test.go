@@ -65,9 +65,8 @@ var _ = Describe("Handler", func() {
 		Context("when should block", func() {
 			BeforeEach(func() {
 				fakePolicyCheckResult := policy.PolicyCheckResult{
-					Allowed:     false,
-					ShouldBlock: true,
-					Reasons:     "a policy says you can't do that\n another policy also says you can't do that",
+					Status:  policy.Block,
+					Reasons: "a policy says you can't do that\n another policy also says you can't do that",
 				}
 				fakePolicyChecker.CheckReturns(fakePolicyCheckResult, nil)
 			})
@@ -89,9 +88,8 @@ var _ = Describe("Handler", func() {
 		Context("when should not block", func() {
 			BeforeEach(func() {
 				fakePolicyCheckResult := policy.PolicyCheckResult{
-					Allowed:     false,
-					ShouldBlock: false,
-					Reasons:     "a policy says you can't do that\n another policy also says you can't do that",
+					Status:  policy.Warn,
+					Reasons: "a policy says you can't do that\n another policy also says you can't do that",
 				}
 				fakePolicyChecker.CheckReturns(fakePolicyCheckResult, nil)
 			})

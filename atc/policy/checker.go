@@ -32,16 +32,27 @@ type PolicyCheckInput struct {
 	Data           interface{} `json:"data,omitempty"`
 }
 
+type Status int
+
+const (
+	Allow Status = iota
+	Block
+	Warn
+)
+
+func (s Status) String() string {
+	return [...]string{"allow", "block", "warn"}[s]
+}
+
 type PolicyCheckResult struct {
-	Allowed     bool
-	ShouldBlock bool
-	Reasons     string
+	Status  Status
+	Reasons string
 }
 
 // PassedPolicyCheck creates a generic passed check
 func PassedPolicyCheck() PolicyCheckResult {
 	return PolicyCheckResult{
-		Allowed: true,
+		Status: Allow,
 	}
 }
 

@@ -51,7 +51,7 @@ var _ = Describe("PolicyChecker", func() {
 		})
 		It("should pass", func() {
 			Expect(checkErr).ToNot(HaveOccurred())
-			Expect(result.Allowed).To(BeTrue())
+			Expect(result.Status).To(Equal(policy.Allow))
 		})
 		It("Agent should not be called", func() {
 			Expect(fakePolicyAgent.CheckCallCount()).To(Equal(0))
@@ -69,7 +69,7 @@ var _ = Describe("PolicyChecker", func() {
 			})
 			It("should pass", func() {
 				Expect(checkErr).ToNot(HaveOccurred())
-				Expect(result.Allowed).To(BeTrue())
+				Expect(result.Status).To(Equal(policy.Allow))
 			})
 			It("Agent should not be called", func() {
 				Expect(fakePolicyAgent.CheckCallCount()).To(Equal(0))
@@ -83,7 +83,7 @@ var _ = Describe("PolicyChecker", func() {
 			})
 			It("should pass", func() {
 				Expect(checkErr).ToNot(HaveOccurred())
-				Expect(result.Allowed).To(BeTrue())
+				Expect(result.Status).To(Equal(policy.Allow))
 			})
 			It("Agent should not be called", func() {
 				Expect(fakePolicyAgent.CheckCallCount()).To(Equal(0))
@@ -98,7 +98,7 @@ var _ = Describe("PolicyChecker", func() {
 			})
 			It("should pass", func() {
 				Expect(checkErr).ToNot(HaveOccurred())
-				Expect(result.Allowed).To(BeTrue())
+				Expect(result.Status).To(Equal(policy.Allow))
 			})
 			It("Agent should not be called", func() {
 				Expect(fakePolicyAgent.CheckCallCount()).To(Equal(0))
@@ -194,7 +194,7 @@ var _ = Describe("PolicyChecker", func() {
 
 					It("it should pass", func() {
 						Expect(checkErr).ToNot(HaveOccurred())
-						Expect(result.Allowed).To(BeTrue())
+						Expect(result.Status).To(Equal(policy.Allow))
 					})
 				})
 
@@ -202,9 +202,8 @@ var _ = Describe("PolicyChecker", func() {
 					BeforeEach(func() {
 						fakePolicyAgent.CheckReturns(
 							policy.PolicyCheckResult{
-								Allowed:     false,
-								ShouldBlock: true,
-								Reasons:     "a policy says you can't do that",
+								Status:  policy.Block,
+								Reasons: "a policy says you can't do that",
 							},
 							nil,
 						)
@@ -212,8 +211,7 @@ var _ = Describe("PolicyChecker", func() {
 
 					It("should not pass", func() {
 						Expect(checkErr).ToNot(HaveOccurred())
-						Expect(result.Allowed).To(BeFalse())
-						Expect(result.ShouldBlock).To(BeTrue())
+						Expect(result.Status).To(Equal(policy.Block))
 						Expect(result.Reasons).To(Equal("a policy says you can't do that"))
 					})
 				})

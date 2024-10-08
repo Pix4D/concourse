@@ -1,6 +1,7 @@
 package opa_test
 
 import (
+	"github.com/concourse/concourse/atc/policy"
 	"github.com/concourse/concourse/atc/policy/opa"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -55,8 +56,7 @@ var _ = Describe("OPA Result", func() {
 					ResultAllowedKey: "a.b",
 				})
 				Expect(err).ToNot(HaveOccurred())
-				Expect(result.Allowed).To(BeTrue())
-				Expect(result.ShouldBlock).To((BeFalse()))
+				Expect(result.Status).To(Equal(policy.Allow))
 				Expect(result.Reasons).To(BeEmpty())
 			})
 		})
@@ -67,8 +67,7 @@ var _ = Describe("OPA Result", func() {
 					ResultAllowedKey: "a.b",
 				})
 				Expect(err).ToNot(HaveOccurred())
-				Expect(result.Allowed).To(BeFalse())
-				Expect(result.ShouldBlock).To((BeTrue()))
+				Expect(result.Status).To(Equal(policy.Block))
 				Expect(result.Reasons).To(Equal("policy check failed"))
 			})
 		})
@@ -80,8 +79,7 @@ var _ = Describe("OPA Result", func() {
 					ResultShouldBlockKey: "a.c",
 				})
 				Expect(err).ToNot(HaveOccurred())
-				Expect(result.Allowed).To(BeTrue())
-				Expect(result.ShouldBlock).To((BeFalse()))
+				Expect(result.Status).To(Equal(policy.Allow))
 				Expect(result.Reasons).To(BeEmpty())
 			})
 		})
@@ -94,8 +92,7 @@ var _ = Describe("OPA Result", func() {
 					ResultMessagesKey:    "a.d",
 				})
 				Expect(err).ToNot(HaveOccurred())
-				Expect(result.Allowed).To(BeFalse())
-				Expect(result.ShouldBlock).To((BeTrue()))
+				Expect(result.Status).To(Equal(policy.Block))
 				Expect(result.Reasons).To(Equal("policy check failed:\n * e\n * f"))
 			})
 		})

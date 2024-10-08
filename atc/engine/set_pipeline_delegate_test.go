@@ -130,9 +130,8 @@ var _ = Describe("SetPipelineStepDelegate", func() {
 					BeforeEach(func() {
 						fakePolicyChecker.CheckReturns(
 							policy.PolicyCheckResult{
-								Allowed:     false,
-								ShouldBlock: true,
-								Reasons:     "policy check failed\nreasonA\nreasonB",
+								Status:  policy.Block,
+								Reasons: "policy check failed\nreasonA\nreasonB",
 							},
 							nil,
 						)
@@ -150,9 +149,8 @@ var _ = Describe("SetPipelineStepDelegate", func() {
 					BeforeEach(func() {
 						fakePolicyChecker.CheckReturns(
 							policy.PolicyCheckResult{
-								Allowed:     false,
-								ShouldBlock: false,
-								Reasons:     "policy check failed\nreasonA\nreasonB",
+								Status:  policy.Warn,
+								Reasons: "policy check failed\nreasonA\nreasonB",
 							},
 							nil,
 						)

@@ -60,6 +60,11 @@ func ParseOpaResult(bytesResult []byte, opaConfig OpaConfig) (policy.PolicyCheck
 		return policy.PassedPolicyCheck(), nil
 	}
 
+	var status = policy.Warn
+	if shouldBlock {
+		status = policy.Block
+	}
+
 	var reasons string
 	if len(messages) == 0 {
 		reasons = "policy check failed"
@@ -67,5 +72,5 @@ func ParseOpaResult(bytesResult []byte, opaConfig OpaConfig) (policy.PolicyCheck
 		reasons = fmt.Sprintf("policy check failed:\n * %s", strings.Join(messages, "\n * "))
 	}
 
-	return policy.PolicyCheckResult{Allowed: allowed, ShouldBlock: shouldBlock, Reasons: reasons}, nil
+	return policy.PolicyCheckResult{Status: status, Reasons: reasons}, nil
 }
