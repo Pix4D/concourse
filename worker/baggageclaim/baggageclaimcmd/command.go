@@ -10,6 +10,7 @@ import (
 	"github.com/concourse/concourse/worker/baggageclaim/api"
 	"github.com/concourse/concourse/worker/baggageclaim/uidgid"
 	"github.com/concourse/concourse/worker/baggageclaim/volume"
+	bespec "github.com/concourse/concourse/worker/runtime/spec"
 	"github.com/concourse/flag/v2"
 	"github.com/tedsuo/ifrit"
 	"github.com/tedsuo/ifrit/grouper"
@@ -39,6 +40,10 @@ type BaggageclaimCommand struct {
 	OverlaysDir string `long:"overlays-dir" description:"Path to directory in which to store overlay data"`
 
 	DisableUserNamespaces bool `long:"disable-user-namespaces" description:"Disable remapping of user/group IDs in unprivileged volumes."`
+
+	// We don't expose PrivilegedMode here as a flag because we want the value
+	// passed in from the Containerd struct
+	PrivilegedMode bespec.PrivilegedMode `hidden:"true"`
 }
 
 func (cmd *BaggageclaimCommand) Execute(args []string) error {
@@ -55,22 +60,7 @@ func (cmd *BaggageclaimCommand) Runner(args []string) (ifrit.Runner, error) {
 
 	listenAddr := fmt.Sprintf("%s:%d", cmd.BindIP.IP, cmd.BindPort)
 
-	var privilegedNamespacer, unprivilegedNamespacer uidgid.Namespacer
-
-	if !cmd.DisableUserNamespaces && uidgid.Supported() {
-		privilegedNamespacer = &uidgid.UidNamespacer{
-			Translator: uidgid.NewTranslator(uidgid.NewPrivilegedMapper()),
-			Logger:     logger.Session("uid-namespacer"),
-		}
-
-		unprivilegedNamespacer = &uidgid.UidNamespacer{
-			Translator: uidgid.NewTranslator(uidgid.NewUnprivilegedMapper()),
-			Logger:     logger.Session("uid-namespacer"),
-		}
-	} else {
-		privilegedNamespacer = uidgid.NoopNamespacer{}
-		unprivilegedNamespacer = uidgid.NoopNamespacer{}
-	}
+	privilegedNamespacer, unprivilegedNamespacer := cmd.SelectNamespacers(logger)
 
 	locker := volume.NewLockManager()
 
@@ -129,6 +119,31 @@ func (cmd *BaggageclaimCommand) Runner(args []string) (ifrit.Runner, error) {
 			"addr": listenAddr,
 		})
 	}), nil
+}
+
+func (cmd *BaggageclaimCommand) SelectNamespacers(logger lager.Logger) (uidgid.Namespacer, uidgid.Namespacer) {
+	var privilegedNamespacer, unprivilegedNamespacer uidgid.Namespacer
+
+	if !cmd.DisableUserNamespaces && uidgid.Supported() {
+		privilegedNamespacer = &uidgid.UidNamespacer{
+			Translator: uidgid.NewTranslator(uidgid.NewPrivilegedMapper()),
+			Logger:     logger.Session("uid-namespacer"),
+		}
+
+		unprivilegedNamespacer = &uidgid.UidNamespacer{
+			Translator: uidgid.NewTranslator(uidgid.NewUnprivilegedMapper()),
+			Logger:     logger.Session("uid-namespacer"),
+		}
+	} else {
+		privilegedNamespacer = uidgid.NoopNamespacer{}
+		unprivilegedNamespacer = uidgid.NoopNamespacer{}
+	}
+
+	if cmd.PrivilegedMode != bespec.FullPrivilegedMode {
+		privilegedNamespacer = unprivilegedNamespacer
+	}
+
+	return privilegedNamespacer, unprivilegedNamespacer
 }
 
 func (cmd *BaggageclaimCommand) constructLogger() (lager.Logger, *lager.ReconfigurableSink) {
