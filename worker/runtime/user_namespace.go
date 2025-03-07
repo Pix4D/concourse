@@ -31,9 +31,9 @@ func (s *userNamespace) MaxValidIds() (uint32, uint32, error) {
 }
 
 func maxValidFromFile(fname string) (uint32, error) {
-	f, err := os.Open(uidMap)
+	f, err := os.Open(fname)
 	if err != nil {
-		return 0, fmt.Errorf("open %s: %w", uidMap, err)
+		return 0, fmt.Errorf("open %s: %w", fname, err)
 	}
 	defer f.Close()
 
@@ -97,7 +97,7 @@ func MaxValid(r io.Reader) (uint32, error) {
 			return 0, fmt.Errorf("scanf: %w", err)
 		}
 
-		val = maxUint(val, inside+size-1)
+		val = max(val, inside+size-1)
 		lines++
 	}
 
@@ -111,12 +111,4 @@ func MaxValid(r io.Reader) (uint32, error) {
 	}
 
 	return val, nil
-}
-
-func maxUint(a, b uint32) uint32 {
-	if a > b {
-		return a
-	}
-
-	return b
 }
