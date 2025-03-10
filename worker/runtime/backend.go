@@ -1,3 +1,5 @@
+//go:build linux
+
 // Package backend provides the implementation of a Garden server backed by
 // containerd.
 //
@@ -7,6 +9,7 @@ package runtime
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"time"
@@ -405,7 +408,9 @@ func (b *GardenBackend) Destroy(handle string) error {
 
 	err = b.network.ResumeContainerTraffic(handle)
 	if err != nil {
-		return fmt.Errorf("resume container traffic: %w", err)
+		if !errors.Is(err, ErrGettingContainerIP) {
+			return fmt.Errorf("resume container traffic: %w", err)
+		}
 	}
 
 	err = b.network.Remove(ctx, task, handle)

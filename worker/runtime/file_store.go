@@ -1,3 +1,5 @@
+//go:build linux
+
 package runtime
 
 import (
@@ -96,9 +98,6 @@ func (f fileStore) ContainerIpLookup(handle string) (string, error) {
 	found, ip, _ := hosts.HostAddressLookup(handle, txeh.IPFamilyV4)
 	if !found {
 		return "", fmt.Errorf("ip not found for container handle: %s", handle)
-	}
-	if err != nil {
-		return "", fmt.Errorf("error finding container ip: %w", err)
 	}
 
 	return ip, nil

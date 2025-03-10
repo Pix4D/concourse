@@ -1,3 +1,5 @@
+//go:build linux
+
 package runtime
 
 import (
@@ -5,12 +7,14 @@ import (
 	"fmt"
 	"io"
 	"regexp"
+	"slices"
 	"time"
 
 	"code.cloudfoundry.org/garden"
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cio"
-	uuid "github.com/nu7hatch/gouuid"
+	"github.com/containerd/containerd/errdefs"
+	"github.com/google/uuid"
 	"github.com/opencontainers/runtime-spec/specs-go"
 )
 
@@ -54,7 +58,6 @@ func (c *Container) Handle() string {
 }
 
 // Stop stops a container.
-//
 func (c *Container) Stop(kill bool) error {
 	ctx := context.Background()
 
@@ -77,7 +80,6 @@ func (c *Container) Stop(kill bool) error {
 }
 
 // Run a process inside the container.
-//
 func (c *Container) Run(
 	spec garden.ProcessSpec,
 	processIO garden.ProcessIO,
@@ -101,7 +103,23 @@ func (c *Container) Run(
 
 	task, err := c.container.Task(ctx, nil)
 	if err != nil {
-		return nil, fmt.Errorf("task retrieval: %w", err)
+		if errdefs.IsNotFound(err) {
+			// The containerd task is usually made during container creation.
+			// The task may have been killed if the containerd daemon was
+			// restarted. We can recover from this error by recreating the task
+			// and continuing as usual
+			initTask, err := c.container.NewTask(ctx, cio.NullIO, containerd.WithNoNewKeyring)
+			if err != nil {
+				return nil, fmt.Errorf("recreating init task: %w", err)
+			}
+			err = initTask.Start(ctx)
+			if err != nil {
+				return nil, fmt.Errorf("restarting init task: %w", err)
+			}
+			task = initTask
+		} else {
+			return nil, fmt.Errorf("task retrieval: %w", err)
+		}
 	}
 
 	id := procID(spec)
@@ -150,7 +168,6 @@ func (c *Container) Run(
 }
 
 // Attach starts streaming the output back to the client from a specified process.
-//
 func (c *Container) Attach(pid string, processIO garden.ProcessIO) (process garden.Process, err error) {
 	ctx := context.Background()
 
@@ -160,7 +177,7 @@ func (c *Container) Attach(pid string, processIO garden.ProcessIO) (process gard
 
 	task, err := c.container.Task(ctx, cio.Load)
 	if err != nil {
-		return nil, fmt.Errorf("task: %w", err)
+		return nil, fmt.Errorf("task attach: %w", err)
 	}
 
 	cioOpts := containerdCIO(processIO, false)
@@ -188,7 +205,6 @@ func (c *Container) Attach(pid string, processIO garden.ProcessIO) (process gard
 }
 
 // Properties returns the current set of properties
-//
 func (c *Container) Properties() (garden.Properties, error) {
 	ctx := context.Background()
 
@@ -201,7 +217,6 @@ func (c *Container) Properties() (garden.Properties, error) {
 }
 
 // Property returns the value of the property with the specified name.
-//
 func (c *Container) Property(name string) (string, error) {
 	properties, err := c.Properties()
 	if err != nil {
@@ -217,7 +232,6 @@ func (c *Container) Property(name string) (string, error) {
 }
 
 // Set a named property on a container to a specified value.
-//
 func (c *Container) SetProperty(name string, value string) error {
 	labelSet, err := propertiesToLabels(garden.Properties{name: value})
 	if err != nil {
@@ -262,7 +276,6 @@ func (c *Container) StreamOut(spec garden.StreamOutSpec) (readCloser io.ReadClos
 }
 
 // SetGraceTime stores the grace time as a containerd label with key "garden.grace-time"
-//
 func (c *Container) SetGraceTime(graceTime time.Duration) error {
 	err := c.SetProperty(GraceTimeKey, fmt.Sprintf("%d", graceTime))
 	if err != nil {
@@ -343,7 +356,7 @@ func (c *Container) BulkNetOut(netOutRules []garden.NetOutRule) (err error) {
 func procID(gdnProcSpec garden.ProcessSpec) string {
 	id := gdnProcSpec.ID
 	if id == "" {
-		uuid, err := uuid.NewV4()
+		uuid, err := uuid.NewRandom()
 		if err != nil {
 			panic(fmt.Errorf("uuid gen: %w", err))
 		}
@@ -401,13 +414,11 @@ func (c *Container) setupContainerdProcSpec(gdnProcSpec garden.ProcessSpec, cont
 }
 
 // Set a default path based on the UID if no existing PATH is found
-//
 func envWithDefaultPath(uid uint32, currentEnv []string) string {
 	pathRegexp := regexp.MustCompile("^PATH=.*$")
-	for _, envVar := range currentEnv {
-		if pathRegexp.MatchString(envVar) {
-			return ""
-		}
+	pathFound := slices.ContainsFunc(currentEnv, pathRegexp.MatchString)
+	if pathFound {
+		return ""
 	}
 
 	if uid == 0 {

@@ -22,7 +22,7 @@ require (
 	github.com/cenkalti/backoff/v5 v5.0.2
 	github.com/concourse/dex v1.9.0
 	github.com/concourse/flag/v2 v2.2.0
-	github.com/concourse/houdini v1.2.0
+	github.com/concourse/houdini v1.3.0
 	github.com/concourse/retryhttp v1.2.4
 	github.com/containerd/containerd v1.7.25
 	github.com/containerd/containerd/api v1.8.0
@@ -33,7 +33,7 @@ require (
 	github.com/cyberark/conjur-api-go v0.12.12
 	github.com/fatih/color v1.18.0
 	github.com/felixge/httpsnoop v1.0.4
-	github.com/go-jose/go-jose/v3 v3.0.3
+	github.com/go-jose/go-jose/v3 v3.0.4
 	github.com/gobwas/glob v0.2.3
 	github.com/goccy/go-yaml v1.15.23
 	github.com/golang/groupcache v0.0.0-20241129210726-2c02b8208cf8
@@ -58,7 +58,6 @@ require (
 	github.com/mgutz/ansi v0.0.0-20200706080929-d51e80ef957d
 	github.com/miekg/dns v1.1.63
 	github.com/mitchellh/mapstructure v1.5.0
-	github.com/nu7hatch/gouuid v0.0.0-20131221200532-179d4d0c4d8d
 	github.com/onsi/ginkgo/v2 v2.22.2
 	github.com/onsi/gomega v1.36.2
 	github.com/opencontainers/runc v1.2.5
@@ -127,7 +126,7 @@ require (
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/google/go-cmp v0.6.0 // indirect
 	github.com/google/gofuzz v1.2.0 // indirect
-	github.com/google/uuid v1.6.0 // indirect
+	github.com/google/uuid v1.6.0
 	github.com/googleapis/gax-go/v2 v2.14.1 // indirect
 	github.com/gorilla/handlers v1.5.2 // indirect
 	github.com/gorilla/mux v1.8.1 // indirect
@@ -204,6 +203,8 @@ require (
 	github.com/containerd/log v0.1.0 // indirect
 	github.com/containerd/platforms v1.0.0-rc.1 // indirect
 	github.com/coreos/go-oidc/v3 v3.12.0 // indirect
+	github.com/coreos/go-systemd/v22 v22.5.0 // indirect
+	github.com/cyphar/filepath-securejoin v0.4.1 // indirect
 	github.com/danieljoos/wincred v1.2.2 // indirect
 	github.com/distribution/reference v0.6.0 // indirect
 	github.com/emicklei/go-restful/v3 v3.12.1 // indirect
