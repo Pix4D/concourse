@@ -1,6 +1,9 @@
+//go:build linux
+
 package spec_test
 
 import (
+	"slices"
 	"testing"
 
 	"code.cloudfoundry.org/garden"
@@ -552,7 +555,14 @@ func (s *SpecSuite) TestContainerSpec() {
 			},
 			check: func(oci *specs.Spec) {
 				s.NotEmpty(oci.Linux.Seccomp)
-				s.NotContains(oci.Linux.Seccomp.Syscalls, spec.AllowSyscall("unshare"))
+				var found bool
+				for _, syscall := range oci.Linux.Seccomp.Syscalls {
+					if slices.Contains(syscall.Names, "unshare") {
+						found = true
+						break
+					}
+				}
+				s.False(found, "unshare syscall should NOT be allowed")
 			},
 		},
 		{
@@ -563,7 +573,15 @@ func (s *SpecSuite) TestContainerSpec() {
 			},
 			privilegedMode: spec.FUSEOnlyPrivilegedMode,
 			check: func(oci *specs.Spec) {
-				s.Contains(oci.Linux.Seccomp.Syscalls, spec.AllowSyscall("unshare"))
+				s.NotEmpty(oci.Linux.Seccomp)
+				var found bool
+				for _, syscall := range oci.Linux.Seccomp.Syscalls {
+					if slices.Contains(syscall.Names, "unshare") && syscall.Action == specs.ActAllow {
+						found = true
+						break
+					}
+				}
+				s.True(found, "unshare syscall should be allowed")
 			},
 		},
 		{

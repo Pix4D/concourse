@@ -7,7 +7,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"math/rand"
+	"math/rand/v2"
 	"net"
 	"net/http"
 	_ "net/http/pprof"
@@ -1120,7 +1120,7 @@ func (cmd *RunCommand) backendComponents(
 			Runnable: lidar.NewScanner(
 				dbCheckFactory,
 				atc.NewPlanFactory(time.Now().Unix()),
-				50,
+				1000,
 			),
 		},
 		{
@@ -2103,6 +2103,6 @@ func (cmd *RunCommand) isMTLSEnabled() bool {
 type rander struct{}
 
 func (r rander) Int() int {
-	// The global rand is thread-safe.
+	// math/rand/v2 uses per-goroutine generators, avoiding lock contention
 	return rand.Int()
 }
