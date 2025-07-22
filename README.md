@@ -1,4 +1,4 @@
-# Concourse: the continuous thing-doer.
+# Concourse
 
 [![Discord](https://img.shields.io/discord/219899946617274369.svg?label=&logo=discord&logoColor=ffffff&color=7389D8&labelColor=6A7EC2)][discord]
 [![Build](https://ci.concourse-ci.org/api/v1/teams/main/pipelines/concourse/badge)](https://ci.concourse-ci.org/teams/main/pipelines/concourse)
@@ -14,6 +14,7 @@ complex.
 Concourse is very opinionated about a few things: idempotency, immutability,
 declarative config, stateless workers, and reproducible builds.
 
+<!--- Leaving this here for now my for my own reference
 ## The road to Concourse v10
 
 [Concourse v10][v10] is the code name for a set of features which, when used
@@ -82,6 +83,7 @@ support such common functionality the "Concoursey way!" 🙏
 
 [v10]: https://blog.concourse-ci.org/2019/07/17/core-roadmap-towards-v10.html
 [prototypes]: https://blog.concourse-ci.org/2019/10/15/reinventing-resource-types.html
+--->
 
 ## Installation
 
@@ -101,16 +103,22 @@ Consult their GitHub repos for more information:
 
 ```sh
 $ wget https://concourse-ci.org/docker-compose.yml
-$ docker-compose up
+$ docker-compose up -d
 Creating docs_concourse-db_1 ... done
 Creating docs_concourse_1    ... done
 ```
 
-Concourse will be running at [127.0.0.1:8080](http://127.0.0.1:8080). You can
+Concourse will be running at [localhost:8080](http://localhost:8080). You can
 log in with the username/password as `test`/`test`.
 
-> :warning: **If you are using an M1 mac**: M1 macs are incompatible with the `containerd` runtime. After downloading the docker-compose file, change `CONCOURSE_WORKER_RUNTIME: "containerd"` to `CONCOURSE_WORKER_RUNTIME: "houdini"`.
-**This feature is experimental**
+> :warning: **If you are using an M-series mac**, note that they are
+> incompatible with the `containerd` runtime until
+> [#1379](https://github.com/concourse/concourse/issues/1379) is resolved.
+> After downloading the docker-compose file, change:
+>
+> `CONCOURSE_WORKER_RUNTIME: "containerd"` to
+>
+> `CONCOURSE_WORKER_RUNTIME: "houdini"`.
 
 Next, install `fly` by downloading it from the web UI and target your local
 Concourse as the `test` user:
@@ -121,6 +129,9 @@ logging in to team 'main'
 
 target saved
 ```
+
+You can follow our [Getting Started Tutorial](https://concourse-ci.org/getting-started.html)
+to learn how to write Concourse pipelines.
 
 ### Configuring a Pipeline
 
@@ -158,10 +169,10 @@ Concourse instance to the next.
 ### Learn More
 
 * The [Official Site](https://concourse-ci.org) for documentation,
-  reference material, and example pipelines (which no longer live in this repository).
-* The [Concourse Tutorial](https://concoursetutorial.com) by Stark & Wayne is
-  great for a guided introduction to all the core concepts.
-* See Concourse in action with our [production pipelines](https://ci.concourse-ci.org/)
+  reference material, and example pipelines.
+* The [Getting Started Tutorial](https://concourse-ci.org/getting-started.html)
+  to learn the basics of pipelines
+* See Concourse in action with our [own pipelines](https://ci.concourse-ci.org/)
 * Hang around in the [GitHub discussions](https://github.com/concourse/concourse/discussions) or in
   [Discord](https://discord.gg/MeRxXKW).
 * See what we're working on the [project board](https://github.com/orgs/concourse/projects). 

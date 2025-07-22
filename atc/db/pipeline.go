@@ -330,7 +330,7 @@ func (p *pipeline) ResourceVersion(resourceConfigVersionID int) (atc.ResourceVer
 		NOT EXISTS (
 			SELECT 1
 			FROM resource_disabled_versions d, resources r
-			WHERE v.version_sha256 = d.version_sha256
+			WHERE v.version_md5 = d.version_md5
 			AND r.resource_config_scope_id = v.resource_config_scope_id
 			AND r.id = d.resource_id
 		)`
@@ -367,7 +367,7 @@ func (p *pipeline) ResourceVersion(resourceConfigVersionID int) (atc.ResourceVer
 func (p *pipeline) GetBuildsWithVersionAsInput(resourceID, resourceConfigVersionID int) ([]Build, error) {
 	rows, err := buildsQuery.
 		Join("build_resource_config_version_inputs bi ON bi.build_id = b.id").
-		Join("resource_config_versions rcv ON rcv.version_sha256 = bi.version_sha256").
+		Join("resource_config_versions rcv ON rcv.version_md5 = bi.version_md5").
 		Where(sq.Eq{
 			"rcv.id":         resourceConfigVersionID,
 			"bi.resource_id": resourceID,
@@ -395,7 +395,7 @@ func (p *pipeline) GetBuildsWithVersionAsInput(resourceID, resourceConfigVersion
 func (p *pipeline) GetBuildsWithVersionAsOutput(resourceID, resourceConfigVersionID int) ([]Build, error) {
 	rows, err := buildsQuery.
 		Join("build_resource_config_version_outputs bo ON bo.build_id = b.id").
-		Join("resource_config_versions rcv ON rcv.version_sha256 = bo.version_sha256").
+		Join("resource_config_versions rcv ON rcv.version_md5 = bo.version_md5").
 		Where(sq.Eq{
 			"rcv.id":         resourceConfigVersionID,
 			"bo.resource_id": resourceID,
@@ -457,7 +457,7 @@ func (p *pipeline) ResourceByID(id int) (Resource, bool, error) {
 	})
 }
 
-func (p *pipeline) resource(where map[string]interface{}) (Resource, bool, error) {
+func (p *pipeline) resource(where map[string]any) (Resource, bool, error) {
 	row := resourcesQuery.
 		Where(where).
 		RunWith(p.conn).
@@ -523,7 +523,7 @@ func (p *pipeline) ResourceType(name string) (ResourceType, bool, error) {
 	})
 }
 
-func (p *pipeline) resourceType(where map[string]interface{}) (ResourceType, bool, error) {
+func (p *pipeline) resourceType(where map[string]any) (ResourceType, bool, error) {
 	row := resourceTypesQuery.
 		Where(where).
 		RunWith(p.conn).
@@ -575,7 +575,7 @@ func (p *pipeline) Prototype(name string) (Prototype, bool, error) {
 	})
 }
 
-func (p *pipeline) prototype(where map[string]interface{}) (Prototype, bool, error) {
+func (p *pipeline) prototype(where map[string]any) (Prototype, bool, error) {
 	row := prototypesQuery.
 		Where(where).
 		RunWith(p.conn).
@@ -797,10 +797,10 @@ func (p *pipeline) LoadDebugVersionsDB() (*atc.DebugVersionsDB, error) {
 	rows, err := psql.Select("v.id, v.check_order, r.id, v.resource_config_scope_id, o.build_id, b.job_id").
 		From("build_resource_config_version_outputs o").
 		Join("builds b ON b.id = o.build_id").
-		Join("resource_config_versions v ON v.version_sha256 = o.version_sha256").
+		Join("resource_config_versions v ON v.version_md5 = o.version_md5").
 		Join("resources r ON r.id = o.resource_id").
 		Where(sq.Expr("r.resource_config_scope_id = v.resource_config_scope_id")).
-		Where(sq.Expr("(r.id, v.version_sha256) NOT IN (SELECT resource_id, version_sha256 from resource_disabled_versions)")).
+		Where(sq.Expr("(r.id, v.version_md5) NOT IN (SELECT resource_id, version_md5 from resource_disabled_versions)")).
 		Where(sq.Eq{
 			"b.status":      BuildStatusSucceeded,
 			"r.pipeline_id": p.id,
@@ -829,10 +829,10 @@ func (p *pipeline) LoadDebugVersionsDB() (*atc.DebugVersionsDB, error) {
 	rows, err = psql.Select("v.id, v.check_order, r.id, v.resource_config_scope_id, i.build_id, i.name, b.job_id, b.status = 'succeeded'").
 		From("build_resource_config_version_inputs i").
 		Join("builds b ON b.id = i.build_id").
-		Join("resource_config_versions v ON v.version_sha256 = i.version_sha256").
+		Join("resource_config_versions v ON v.version_md5 = i.version_md5").
 		Join("resources r ON r.id = i.resource_id").
 		Where(sq.Expr("r.resource_config_scope_id = v.resource_config_scope_id")).
-		Where(sq.Expr("(r.id, v.version_sha256) NOT IN (SELECT resource_id, version_sha256 from resource_disabled_versions)")).
+		Where(sq.Expr("(r.id, v.version_md5) NOT IN (SELECT resource_id, version_md5 from resource_disabled_versions)")).
 		Where(sq.Eq{
 			"r.pipeline_id": p.id,
 			"r.active":      true,
@@ -871,12 +871,12 @@ func (p *pipeline) LoadDebugVersionsDB() (*atc.DebugVersionsDB, error) {
 	rows, err = psql.Select("v.id, v.check_order, r.id, v.resource_config_scope_id").
 		From("resource_config_versions v").
 		Join("resources r ON r.resource_config_scope_id = v.resource_config_scope_id").
-		LeftJoin("resource_disabled_versions d ON d.resource_id = r.id AND d.version_sha256 = v.version_sha256").
+		LeftJoin("resource_disabled_versions d ON d.resource_id = r.id AND d.version_md5 = v.version_md5").
 		Where(sq.Eq{
-			"r.pipeline_id":    p.id,
-			"r.active":         true,
-			"d.resource_id":    nil,
-			"d.version_sha256": nil,
+			"r.pipeline_id": p.id,
+			"r.active":      true,
+			"d.resource_id": nil,
+			"d.version_md5": nil,
 		}).
 		RunWith(tx).
 		Query()
@@ -1032,7 +1032,7 @@ func (p *pipeline) CreateOneOffBuild() (Build, error) {
 	defer Rollback(tx)
 
 	build := newEmptyBuild(p.conn, p.lockFactory)
-	err = createBuild(tx, build, map[string]interface{}{
+	err = createBuild(tx, build, map[string]any{
 		"name":        sq.Expr("nextval('one_off_name')"),
 		"pipeline_id": p.id,
 		"team_id":     p.teamID,
@@ -1069,7 +1069,7 @@ func (p *pipeline) CreateStartedBuild(plan atc.Plan) (Build, error) {
 	}
 
 	build := newEmptyBuild(p.conn, p.lockFactory)
-	err = createBuild(tx, build, map[string]interface{}{
+	err = createBuild(tx, build, map[string]any{
 		"name":         sq.Expr("nextval('one_off_name')"),
 		"pipeline_id":  p.id,
 		"team_id":      p.teamID,
@@ -1136,7 +1136,7 @@ func (p *pipeline) Variables(logger lager.Logger, globalSecrets creds.Secrets, v
 			return nil, errors.Wrapf(err, "evaluate var_source '%s' error", cm.Name)
 		}
 
-		config, ok := newConfig["config"].(map[string]interface{})
+		config, ok := newConfig["config"].(map[string]any)
 		if !ok {
 			return nil, fmt.Errorf("var_source '%s' invalid config", cm.Name)
 		}
