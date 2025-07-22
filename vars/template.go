@@ -29,7 +29,7 @@ func (t Template) ExtraVarNames() []string {
 }
 
 func (t Template) Evaluate(vars Variables, opts EvaluateOpts) ([]byte, error) {
-	var obj interface{}
+	var obj any
 
 	// Note: if we do end up changing from "gopkg.in/yaml.v2" to
 	// "sigs.k8s.io/yaml" here, we'll want to ensure we call
@@ -53,7 +53,7 @@ func (t Template) Evaluate(vars Variables, opts EvaluateOpts) ([]byte, error) {
 	return bytes, nil
 }
 
-func (t Template) interpolateRoot(obj interface{}, tracker varsTracker) (interface{}, error) {
+func (t Template) interpolateRoot(obj any, tracker varsTracker) (any, error) {
 	var err error
 	obj, err = interpolator{}.Interpolate(obj, tracker)
 	if err != nil {
@@ -70,9 +70,9 @@ var (
 	interpolationAnchoredRegex = regexp.MustCompile("\\A" + interpolationRegex.String() + "\\z")
 )
 
-func (i interpolator) Interpolate(node interface{}, tracker varsTracker) (interface{}, error) {
+func (i interpolator) Interpolate(node any, tracker varsTracker) (any, error) {
 	switch typedNode := node.(type) {
-	case map[interface{}]interface{}:
+	case map[any]any:
 		for k, v := range typedNode {
 			evaluatedValue, err := i.Interpolate(v, tracker)
 			if err != nil {
@@ -88,7 +88,7 @@ func (i interpolator) Interpolate(node interface{}, tracker varsTracker) (interf
 			typedNode[evaluatedKey] = evaluatedValue
 		}
 
-	case []interface{}:
+	case []any:
 		for idx, x := range typedNode {
 			var err error
 			typedNode[idx], err = i.Interpolate(x, tracker)
@@ -145,9 +145,8 @@ type varsTracker struct {
 	expectAllFound bool
 	expectAllUsed  bool
 
-	missing    map[string]struct{}
-	visited    map[string]struct{}
-	visitedAll map[string]struct{} // track all var names that were accessed
+	missing map[string]struct{}
+	visited map[string]struct{} // track all var names that were accessed
 }
 
 func newVarsTracker(vars Variables, expectAllFound, expectAllUsed bool) varsTracker {
@@ -157,20 +156,19 @@ func newVarsTracker(vars Variables, expectAllFound, expectAllUsed bool) varsTrac
 		expectAllUsed:  expectAllUsed,
 		missing:        map[string]struct{}{},
 		visited:        map[string]struct{}{},
-		visitedAll:     map[string]struct{}{},
 	}
 }
 
 // Get value of a var. Name can be the following formats: 1) 'foo', where foo
 // is var name; 2) 'foo:bar', where foo is var source name, and bar is var name;
 // 3) '.:foo', where . means a local var, foo is var name.
-func (t varsTracker) Get(varName string) (interface{}, bool, error) {
+func (t varsTracker) Get(varName string) (any, bool, error) {
 	varRef, err := ParseReference(varName)
 	if err != nil {
 		return nil, false, err
 	}
 
-	t.visitedAll[identifier(varRef)] = struct{}{}
+	t.visited[identifier(varRef)] = struct{}{}
 
 	val, found, err := t.vars.Get(varRef)
 	if !found || err != nil {
@@ -217,7 +215,7 @@ func (t varsTracker) ExtraError() error {
 
 	for _, ref := range allRefs {
 		id := identifier(ref)
-		if _, found := t.visitedAll[id]; !found {
+		if _, found := t.visited[id]; !found {
 			unusedNames[id] = struct{}{}
 		}
 	}
