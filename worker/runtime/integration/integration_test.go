@@ -1,3 +1,5 @@
+//go:build linux
+
 package integration_test
 
 import (
@@ -21,7 +23,7 @@ import (
 	"github.com/concourse/concourse/worker/runtime"
 	"github.com/concourse/concourse/worker/runtime/libcontainerd"
 	"github.com/concourse/concourse/worker/workercmd"
-	"github.com/containerd/containerd"
+	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/jackpal/gateway"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -903,8 +905,33 @@ func (s *IntegrationSuite) TestGracefulStop() {
 }
 
 func (s *IntegrationSuite) testStop(kill bool) {
+	// Using custom backend, clean up BeforeTest() stuff
+	s.gardenBackend.Stop()
+	s.cleanupIptables()
+
+	namespace := fmt.Sprintf("test-stop-%t", kill)
+	requestTimeout := 3 * time.Second
+
+	network, err := runtime.NewCNINetwork(
+		runtime.WithDefaultsForTesting(),
+	)
+	s.NoError(err)
+
+	customBackend, err := runtime.NewGardenBackend(
+		libcontainerd.New(
+			s.containerdSocket(),
+			namespace,
+			requestTimeout,
+		),
+		runtime.WithNetwork(network),
+		runtime.WithRequestTimeout(requestTimeout),
+	)
+	s.NoError(err)
+
+	s.NoError(customBackend.Start())
+
 	handle := uuid()
-	container, err := s.gardenBackend.Create(garden.ContainerSpec{
+	container, err := customBackend.Create(garden.ContainerSpec{
 		Handle:     handle,
 		RootFSPath: "raw://" + s.rootfs,
 		Privileged: true,
@@ -912,7 +939,7 @@ func (s *IntegrationSuite) testStop(kill bool) {
 	s.NoError(err)
 
 	defer func() {
-		s.NoError(s.gardenBackend.Destroy(handle))
+		s.NoError(customBackend.Destroy(handle))
 	}()
 
 	_, err = container.Run(
@@ -1023,7 +1050,7 @@ func (s *IntegrationSuite) TestPropertiesGetChunked() {
 	handle := uuid()
 
 	longString := ""
-	for i := 0; i < 10000; i++ {
+	for i := range 10000 {
 		longString += strconv.Itoa(i)
 	}
 

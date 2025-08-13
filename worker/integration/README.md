@@ -5,7 +5,7 @@ docker to run the Linux parts of the codebase. Use the following commands to
 run this test suite:
 
 ```bash
-$ docker run -v ~/workspace/concourse:/src -it --entrypoint "/bin/bash" golang
+docker run -v ~/workspace/concourse:/src -it --entrypoint "/bin/bash" golang
 ```
 
 The above command will put you in a terminal session inside a container with
@@ -14,8 +14,8 @@ your local Concourse code mounted at `/src`.
 To run the tests:
 
 ```bash
-$ cd /src/worker/integration
-$ go test
+cd /src
+go test -v  worker/integration
 ```
 
 You can leave the container running while you modify your code. Return to the

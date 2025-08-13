@@ -17,9 +17,9 @@ import (
 	"code.cloudfoundry.org/garden"
 	"github.com/concourse/concourse/worker/runtime/libcontainerd"
 	bespec "github.com/concourse/concourse/worker/runtime/spec"
-	"github.com/containerd/containerd"
-	"github.com/containerd/containerd/cio"
-	"github.com/containerd/containerd/errdefs"
+	containerd "github.com/containerd/containerd/v2/client"
+	"github.com/containerd/containerd/v2/pkg/cio"
+	"github.com/containerd/errdefs"
 	"github.com/opencontainers/runtime-spec/specs-go"
 )
 
@@ -33,6 +33,7 @@ type GardenBackend struct {
 	killer        Killer
 	network       Network
 	rootfsManager RootfsManager
+	ioManager     IOManager
 	userNamespace UserNamespace
 	initBinPath   string
 	// override path for the seccomp profile
@@ -129,6 +130,12 @@ func WithPrivilegedMode(privilegedMode bespec.PrivilegedMode) GardenBackendOpt {
 	}
 }
 
+func WithIOManager(ioManager IOManager) GardenBackendOpt {
+	return func(b *GardenBackend) {
+		b.ioManager = ioManager
+	}
+}
+
 type When struct {
 	Always      bool              `json:"always,omitempty"`
 	Annotations map[string]string `json:"annotations,omitempty"`
@@ -139,7 +146,7 @@ type When struct {
 type HookFile struct {
 	Version string     `json:"version"`
 	Hook    specs.Hook `json:"hook"`
-	When    When       `json:"when,omitempty"`
+	When    When       `json:"when"`
 	Stages  []string   `json:"stages,omitempty"`
 }
 
@@ -248,6 +255,10 @@ func NewGardenBackend(client libcontainerd.Client, opts ...GardenBackendOpt) (b 
 		b.initBinPath = bespec.DefaultInitBinPath
 	}
 
+	if b.ioManager == nil {
+		b.ioManager = NewIOManager()
+	}
+
 	return b, nil
 }
 
@@ -305,6 +316,7 @@ func (b *GardenBackend) Create(gdnSpec garden.ContainerSpec) (garden.Container, 
 		cont,
 		b.killer,
 		b.rootfsManager,
+		b.ioManager,
 	), nil
 }
 
@@ -382,6 +394,9 @@ func (b *GardenBackend) Destroy(handle string) error {
 
 	ctx := context.Background()
 
+	// Releases tracked cio.IO's for the container
+	b.ioManager.Delete(handle)
+
 	container, err := b.client.GetContainer(ctx, handle)
 	if err != nil {
 		return fmt.Errorf("get container: %w", err)
@@ -451,6 +466,7 @@ func (b *GardenBackend) Containers(properties garden.Properties) ([]garden.Conta
 			containerdContainer,
 			b.killer,
 			b.rootfsManager,
+			b.ioManager,
 		)
 	}
 
@@ -472,6 +488,7 @@ func (b *GardenBackend) Lookup(handle string) (garden.Container, error) {
 		containerdContainer,
 		b.killer,
 		b.rootfsManager,
+		b.ioManager,
 	), nil
 }
 

@@ -84,6 +84,7 @@ import (
 	_ "github.com/concourse/concourse/atc/creds/conjur"
 	_ "github.com/concourse/concourse/atc/creds/credhub"
 	_ "github.com/concourse/concourse/atc/creds/dummy"
+	"github.com/concourse/concourse/atc/creds/idtoken"
 	_ "github.com/concourse/concourse/atc/creds/kubernetes"
 	_ "github.com/concourse/concourse/atc/creds/secretsmanager"
 	_ "github.com/concourse/concourse/atc/creds/ssm"
@@ -134,6 +135,12 @@ type RunCommand struct {
 
 	CredentialManagement creds.CredentialManagementConfig `group:"Credential Management"`
 	CredentialManagers   creds.Managers
+
+	SigningKey struct {
+		CheckInterval  time.Duration `long:"check-interval" default:"10m" description:"How often to check for outdated or expired signing keys for the idtoken secrets provider"`
+		RotationPeriod time.Duration `long:"rotation-period" default:"168h" description:"After which time a new signing key for the idtoken secrets provider should be generated. 0 turns off generation of new keys"`
+		GracePeriod    time.Duration `long:"grace-period" default:"24h" description:"How long a key should still be published for the idtoken secrets provider after a new key has been generated"`
+	} `group:"Pipeline Identity Tokens" namespace:"signing-key"`
 
 	EncryptionKey    flag.Cipher `long:"encryption-key"     description:"A 16 or 32 length key used to encrypt sensitive information before storing it in the database."`
 	OldEncryptionKey flag.Cipher `long:"old-encryption-key" description:"Encryption key previously used for encrypting sensitive information. If provided without a new key, data is encrypted. If provided with a new key, data is re-encrypted."`
@@ -485,6 +492,7 @@ func (cmd *RunCommand) WireDynamicFlags(commandFlags *flags.Command) {
 	for name, p := range creds.ManagerFactories() {
 		managerConfigs[name] = p.AddConfig(credsGroup)
 	}
+
 	cmd.CredentialManagers = managerConfigs
 
 	metric.Metrics.WireEmitters(metricsGroup)
@@ -633,6 +641,10 @@ func (cmd *RunCommand) Runner(positionalArguments []string) (ifrit.Runner, error
 	if err != nil {
 		return nil, err
 	}
+
+	idtoken.UpdateGlobalManagerFactory(func(f *idtoken.ManagerFactory) {
+		f.SetIssuer(cmd.ExternalURL.String())
+	})
 
 	secretManager, err := cmd.secretManager(logger)
 	if err != nil {
@@ -835,10 +847,13 @@ func (cmd *RunCommand) constructAPIMembers(
 	dbBuildFactory := db.NewBuildFactory(dbConn, lockFactory, cmd.GC.OneOffBuildGracePeriod, cmd.GC.FailedGracePeriod)
 	dbCheckFactory := db.NewCheckFactory(dbConn, lockFactory, secretManager, cmd.varSourcePool, checkBuildsChan, nil)
 	dbAccessTokenFactory := db.NewAccessTokenFactory(dbConn)
+	dbSigningKeyFactory := db.NewSigningKeyFactory(dbConn)
 	dbClock := db.NewClock()
 	dbWall := db.NewWall(dbConn, &dbClock)
 
-	tokenVerifier := cmd.constructTokenVerifier(dbAccessTokenFactory)
+	MiB := 1024 * 1024
+	claimsCacher := accessor.NewClaimsCacher(dbAccessTokenFactory, 1*MiB)
+	tokenVerifier := cmd.constructTokenVerifier(claimsCacher)
 
 	teamsCacher := accessor.NewTeamsCacher(
 		logger,
@@ -885,6 +900,7 @@ func (cmd *RunCommand) constructAPIMembers(
 		accessFactory,
 		dbWall,
 		policyChecker,
+		dbSigningKeyFactory,
 	)
 	if err != nil {
 		return nil, err
@@ -906,10 +922,12 @@ func (cmd *RunCommand) constructAPIMembers(
 		return nil, err
 	}
 
-	loginHandler, err := cmd.constructLoginHandler(
+	skyHandler, err := cmd.constructSkyHandler(
 		logger,
 		httpClient,
 		middleware,
+		claimsCacher,
+		dbAccessTokenFactory,
 	)
 	if err != nil {
 		return nil, err
@@ -918,6 +936,7 @@ func (cmd *RunCommand) constructAPIMembers(
 	legacyHandler, err := cmd.constructLegacyHandler(
 		logger,
 	)
+
 	if err != nil {
 		return nil, err
 	}
@@ -950,7 +969,7 @@ func (cmd *RunCommand) constructAPIMembers(
 			tlsRedirectHandler{
 				matchHostname: cmd.ExternalURL.URL.Hostname(),
 				externalHost:  cmd.ExternalURL.URL.Host,
-				baseHandler:   loginHandler,
+				baseHandler:   skyHandler,
 			},
 			tlsRedirectHandler{
 				matchHostname: cmd.ExternalURL.URL.Hostname(),
@@ -965,7 +984,7 @@ func (cmd *RunCommand) constructAPIMembers(
 			webHandler,
 			apiHandler,
 			authHandler,
-			loginHandler,
+			skyHandler,
 			legacyHandler,
 			middleware,
 		)
@@ -975,7 +994,7 @@ func (cmd *RunCommand) constructAPIMembers(
 			webHandler,
 			apiHandler,
 			authHandler,
-			loginHandler,
+			skyHandler,
 			legacyHandler,
 			middleware,
 		)
@@ -1037,6 +1056,7 @@ func (cmd *RunCommand) backendComponents(
 	dbJobFactory := db.NewJobFactory(dbConn, lockFactory)
 	dbPipelineLifecycle := db.NewPipelineLifecycle(dbConn, lockFactory)
 	dbPipelinePauser := db.NewPipelinePauser(dbConn, lockFactory)
+	dbSigningKeyFactory := db.NewSigningKeyFactory(dbConn)
 
 	dbWorkerFactory := db.NewWorkerFactory(dbConn, workerCache)
 
@@ -1182,7 +1202,23 @@ func (cmd *RunCommand) backendComponents(
 			},
 			Runnable: buildEventWatcher,
 		},
+		{
+			Component: atc.Component{
+				Name:     atc.ComponentSigningKeyLifecycler,
+				Interval: cmd.SigningKey.CheckInterval,
+			},
+			Runnable: &idtoken.SigningKeyLifecycler{
+				Logger:              logger.Session(atc.ComponentSigningKeyLifecycler),
+				DBSigningKeyFactory: dbSigningKeyFactory,
+				KeyRotationPeriod:   cmd.SigningKey.RotationPeriod,
+				KeyGracePeriod:      cmd.SigningKey.GracePeriod,
+			},
+		},
 	}
+
+	idtoken.UpdateGlobalManagerFactory(func(f *idtoken.ManagerFactory) {
+		f.SetSigningKeyFactory(dbSigningKeyFactory)
+	})
 
 	if syslogDrainConfigured {
 		components = append(components, RunnableComponent{
@@ -1795,7 +1831,7 @@ func (cmd *RunCommand) constructHTTPHandler(
 	webHandler http.Handler,
 	apiHandler http.Handler,
 	authHandler http.Handler,
-	loginHandler http.Handler,
+	skyHandler http.Handler,
 	legacyHandler http.Handler,
 	middleware token.Middleware,
 ) http.Handler {
@@ -1808,10 +1844,11 @@ func (cmd *RunCommand) constructHTTPHandler(
 	webMux := http.NewServeMux()
 	webMux.Handle("/api/v1/", csrfHandler)
 	webMux.Handle("/sky/issuer/", authHandler)
-	webMux.Handle("/sky/", loginHandler)
+	webMux.Handle("/sky/", skyHandler)
 	webMux.Handle("/auth/", legacyHandler)
 	webMux.Handle("/login", legacyHandler)
 	webMux.Handle("/logout", legacyHandler)
+	webMux.Handle("/.well-known/", apiHandler)
 	webMux.Handle("/", webHandler)
 
 	httpHandler := wrappa.LoggerHandler{
@@ -1885,10 +1922,12 @@ func (cmd *RunCommand) constructAuthHandler(
 	), nil
 }
 
-func (cmd *RunCommand) constructLoginHandler(
+func (cmd *RunCommand) constructSkyHandler(
 	logger lager.Logger,
 	httpClient *http.Client,
 	middleware token.Middleware,
+	claimsCacher accessor.AccessTokenFetcher,
+	accessTokenFactory db.AccessTokenFactory,
 ) (http.Handler, error) {
 
 	authPath, _ := url.Parse("/sky/issuer/auth")
@@ -1914,11 +1953,13 @@ func (cmd *RunCommand) constructLoginHandler(
 	}
 
 	skyServer, err := skyserver.NewSkyServer(&skyserver.SkyConfig{
-		Logger:          logger.Session("sky"),
-		TokenMiddleware: middleware,
-		TokenParser:     token.Factory{},
-		OAuthConfig:     oauth2Config,
-		HTTPClient:      httpClient,
+		Logger:             logger.Session("sky"),
+		TokenMiddleware:    middleware,
+		TokenParser:        token.Factory{},
+		OAuthConfig:        oauth2Config,
+		HTTPClient:         httpClient,
+		ClaimsCacher:       claimsCacher,
+		AccessTokenFactory: accessTokenFactory,
 	})
 	if err != nil {
 		return nil, err
@@ -1927,15 +1968,11 @@ func (cmd *RunCommand) constructLoginHandler(
 	return skyserver.NewSkyHandler(skyServer), nil
 }
 
-func (cmd *RunCommand) constructTokenVerifier(accessTokenFactory db.AccessTokenFactory) accessor.TokenVerifier {
-
+func (cmd *RunCommand) constructTokenVerifier(claimsCacher accessor.AccessTokenFetcher) accessor.TokenVerifier {
 	validClients := []string{flyClientID}
 	for clientId := range cmd.Auth.AuthFlags.Clients {
 		validClients = append(validClients, clientId)
 	}
-
-	MiB := 1024 * 1024
-	claimsCacher := accessor.NewClaimsCacher(accessTokenFactory, 1*MiB)
 
 	return accessor.NewVerifier(claimsCacher, validClients)
 }
@@ -1962,6 +1999,7 @@ func (cmd *RunCommand) constructAPIHandler(
 	accessFactory accessor.AccessFactory,
 	dbWall db.Wall,
 	policyChecker policy.Checker,
+	dbSigningKeyFactory db.SigningKeyFactory,
 ) (http.Handler, error) {
 
 	checkPipelineAccessHandlerFactory := auth.NewCheckPipelineAccessHandlerFactory(teamFactory)
@@ -2051,6 +2089,7 @@ func (cmd *RunCommand) constructAPIHandler(
 		time.Minute,
 		dbWall,
 		clock.NewClock(),
+		dbSigningKeyFactory,
 	)
 }
 

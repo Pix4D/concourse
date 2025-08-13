@@ -8,7 +8,7 @@ import (
 
 	"code.cloudfoundry.org/garden"
 	"github.com/concourse/concourse/worker/runtime/spec"
-	"github.com/opencontainers/runc/libcontainer/cgroups"
+	"github.com/opencontainers/cgroups"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -472,6 +472,8 @@ func (s *SpecSuite) TestContainerSpec() {
 						s.NotContains(ociMount.Options, "ro", "%s: %s", ociMount.Destination, ociMount.Type)
 					}
 				}
+				s.Empty(oci.Linux.MaskedPaths)
+				s.Empty(oci.Linux.ReadonlyPaths)
 			},
 		},
 		{

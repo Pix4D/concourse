@@ -37,7 +37,7 @@ func WriteDefaultContainerdConfig(dest string) error {
 	//                   reason about potential problems down the road.
 	//
 	const config = `
-version = 2
+version = 3
 
 oom_score = -999
 disabled_plugins = ["io.containerd.grpc.v1.cri", "io.containerd.snapshotter.v1.aufs", "io.containerd.snapshotter.v1.btrfs", "io.containerd.snapshotter.v1.zfs"]
@@ -66,7 +66,7 @@ func (cmd *WorkerCommand) containerdGardenServerRunner(
 
 	backendOpts, err := cmd.buildUpBackendOpts(logger, cniNetwork)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create contianerd backend opts: %w", err)
+		return nil, fmt.Errorf("failed to create containerd backend opts: %w", err)
 	}
 
 	gardenBackend, err := runtime.NewGardenBackend(
@@ -103,6 +103,10 @@ func (cmd *WorkerCommand) buildUpNetworkOpts(logger lager.Logger, dnsServers []s
 
 	if len(dnsServers) > 0 {
 		networkOpts = append(networkOpts, runtime.WithNameServers(dnsServers))
+	}
+
+	if len(cmd.Containerd.Network.AdditionalHosts) > 0 {
+		networkOpts = append(networkOpts, runtime.WithAdditionalHosts(cmd.Containerd.Network.AdditionalHosts))
 	}
 
 	if len(cmd.Containerd.Network.RestrictedNetworks) > 0 {
@@ -246,7 +250,7 @@ func (cmd *WorkerCommand) containerdRunner(logger lager.Logger) (ifrit.Runner, e
 					}
 					return err == nil
 				},
-				Timeout: 10 * time.Second,
+				Timeout: 60 * time.Second,
 			},
 		},
 		{

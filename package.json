@@ -6,26 +6,26 @@
   "license": "Apache-2.0",
   "type": "module",
   "dependencies": {
-    "request": "^2.86.0",
+    "request": "^2.88.2",
     "uuid": "^11.1.0"
   },
   "devDependencies": {
-    "@babel/core": "^7.25.8",
+    "@babel/core": "^7.28.0",
     "@babel/plugin-syntax-dynamic-import": "7.8.3",
-    "@babel/preset-env": "^7.25.8",
+    "@babel/preset-env": "^7.28.0",
     "@mdi/svg": "7.4.47",
     "babel-loader": "^10.0.0",
     "child-process-promise": "2.2.1",
     "clean-css-cli": "5.6.3",
     "elm": "0.19.1-6",
     "elm-analyse": "0.16.5",
-    "elm-format": "0.8.7",
-    "elm-test": "0.19.1-revision9",
-    "less": "4.2.2",
+    "elm-format": "0.8.8",
+    "elm-test": "0.19.1-revision16",
+    "less": "4.4.0",
     "less-plugin-autoprefix": "2.0.0",
-    "puppeteer": "^24.0.0",
+    "puppeteer": "^24.15.0",
     "uglify-js": "^3.19.3",
-    "webpack": "^5.95.0",
+    "webpack": "^5.101.0",
     "webpack-cli": "6.0.1"
   },
   "resolutions": {
@@ -44,5 +44,5 @@
     "update-mdi-svg": "./hack/update-mdi-svg \"node_modules/@mdi/svg/svg\" | tr -d '\n' > web/public/mdi-svg.min.js",
     "benchmark": "cd web/elm && elm make --optimize --output /tmp/benchmark.html benchmarks/Benchmarks.elm && node benchmarks/benchmark.js /tmp/benchmark.html"
   },
-  "packageManager": "yarn@4.7.0"
+  "packageManager": "yarn@4.9.2"
 }
