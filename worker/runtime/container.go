@@ -11,9 +11,9 @@ import (
 	"time"
 
 	"code.cloudfoundry.org/garden"
-	"github.com/containerd/containerd"
-	"github.com/containerd/containerd/cio"
-	"github.com/containerd/containerd/errdefs"
+	containerd "github.com/containerd/containerd/v2/client"
+	"github.com/containerd/containerd/v2/pkg/cio"
+	"github.com/containerd/errdefs"
 	"github.com/google/uuid"
 	"github.com/opencontainers/runtime-spec/specs-go"
 )
@@ -23,6 +23,12 @@ const (
 	Path          = "PATH=/usr/local/bin:/usr/bin:/bin"
 
 	GraceTimeKey = "garden.grace-time"
+)
+
+var (
+	noSuchFile         = regexp.MustCompile(`starting container process caused: exec: .*: stat .*: no such file or directory`)
+	executableNotFound = regexp.MustCompile(`starting container process caused: exec: .*: executable file not found in \$PATH`)
+	pathRegexp         = regexp.MustCompile("^PATH=.*$")
 )
 
 type UserNotFoundError struct {
@@ -37,17 +43,20 @@ type Container struct {
 	container     containerd.Container
 	killer        Killer
 	rootfsManager RootfsManager
+	ioManager     IOManager
 }
 
 func NewContainer(
 	container containerd.Container,
 	killer Killer,
 	rootfsManager RootfsManager,
+	ioManager IOManager,
 ) *Container {
 	return &Container{
 		container:     container,
 		killer:        killer,
 		rootfsManager: rootfsManager,
+		ioManager:     ioManager,
 	}
 }
 
@@ -124,8 +133,9 @@ func (c *Container) Run(
 
 	id := procID(spec)
 	cioOpts := containerdCIO(processIO, spec.TTY != nil)
+	ioCreator := c.ioManager.Creator(c.Handle(), id, cio.NewCreator(cioOpts...))
 
-	proc, err := task.Exec(ctx, id, &procSpec, cio.NewCreator(cioOpts...))
+	proc, err := task.Exec(ctx, id, &procSpec, ioCreator)
 	if err != nil {
 		return nil, fmt.Errorf("task exec: %w", err)
 	}
@@ -172,7 +182,7 @@ func (c *Container) Attach(pid string, processIO garden.ProcessIO) (process gard
 	ctx := context.Background()
 
 	if pid == "" {
-		return nil, ErrInvalidInput("empty pid")
+		return nil, ErrInvalidInput("empty process id")
 	}
 
 	task, err := c.container.Task(ctx, cio.Load)
@@ -181,8 +191,9 @@ func (c *Container) Attach(pid string, processIO garden.ProcessIO) (process gard
 	}
 
 	cioOpts := containerdCIO(processIO, false)
+	ioAttach := c.ioManager.Attach(c.Handle(), pid, cio.NewAttach(cioOpts...))
 
-	proc, err := task.LoadProcess(ctx, pid, cio.NewAttach(cioOpts...))
+	proc, err := task.LoadProcess(ctx, pid, ioAttach)
 	if err != nil {
 		return nil, fmt.Errorf("load proc: %w", err)
 	}
@@ -415,7 +426,6 @@ func (c *Container) setupContainerdProcSpec(gdnProcSpec garden.ProcessSpec, cont
 
 // Set a default path based on the UID if no existing PATH is found
 func envWithDefaultPath(uid uint32, currentEnv []string) string {
-	pathRegexp := regexp.MustCompile("^PATH=.*$")
 	pathFound := slices.ContainsFunc(currentEnv, pathRegexp.MatchString)
 	if pathFound {
 		return ""
@@ -451,8 +461,5 @@ func containerdCIO(gdnProcIO garden.ProcessIO, tty bool) []cio.Opt {
 }
 
 func isNoSuchExecutable(err error) bool {
-	noSuchFile := regexp.MustCompile(`starting container process caused: exec: .*: stat .*: no such file or directory`)
-	executableNotFound := regexp.MustCompile(`starting container process caused: exec: .*: executable file not found in \$PATH`)
-
 	return noSuchFile.MatchString(err.Error()) || executableNotFound.MatchString(err.Error())
 }

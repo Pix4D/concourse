@@ -1,6 +1,7 @@
 package db
 
 import (
+	"errors"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -9,7 +10,6 @@ import (
 	"code.cloudfoundry.org/lager/v3"
 
 	sq "github.com/Masterminds/squirrel"
-	"github.com/pkg/errors"
 
 	"github.com/concourse/concourse/atc"
 	"github.com/concourse/concourse/atc/creds"
@@ -122,7 +122,7 @@ type Pipeline interface {
 
 	Destroy() error
 
-	Variables(lager.Logger, creds.Secrets, creds.VarSourcePool) (vars.Variables, error)
+	Variables(lager.Logger, creds.Secrets, creds.VarSourcePool, creds.SecretLookupParams) (vars.Variables, error)
 
 	SetParentIDs(jobID, buildID int) error
 }
@@ -1111,8 +1111,8 @@ func (p *pipeline) CreateStartedBuild(plan atc.Plan) (Build, error) {
 // Variables creates variables for this pipeline. If this pipeline has its own
 // var_sources, a vars.MultiVars containing all pipeline specific var_sources
 // plug the global variables, otherwise just return the global variables.
-func (p *pipeline) Variables(logger lager.Logger, globalSecrets creds.Secrets, varSourcePool creds.VarSourcePool) (vars.Variables, error) {
-	globalVars := creds.NewVariables(globalSecrets, p.TeamName(), p.Name(), false)
+func (p *pipeline) Variables(logger lager.Logger, globalSecrets creds.Secrets, varSourcePool creds.VarSourcePool, secretLookupParams creds.SecretLookupParams) (vars.Variables, error) {
+	globalVars := creds.NewVariables(globalSecrets, secretLookupParams, false)
 	namedVarsMap := vars.NamedVariables{}
 
 	// It's safe to add NamedVariables to allVars via an array here, because
@@ -1133,7 +1133,7 @@ func (p *pipeline) Variables(logger lager.Logger, globalSecrets creds.Secrets, v
 		// Interpolate variables in pipeline credential manager's config
 		newConfig, err := creds.NewParams(allVars, atc.Params{"config": cm.Config}).Evaluate()
 		if err != nil {
-			return nil, errors.Wrapf(err, "evaluate var_source '%s' error", cm.Name)
+			return nil, fmt.Errorf("evaluate var_source '%s' error: %w", cm.Name, err)
 		}
 
 		config, ok := newConfig["config"].(map[string]any)
@@ -1142,9 +1142,10 @@ func (p *pipeline) Variables(logger lager.Logger, globalSecrets creds.Secrets, v
 		}
 		secrets, err := varSourcePool.FindOrCreate(logger, config, factory)
 		if err != nil {
-			return nil, errors.Wrapf(err, "create var_source '%s' error", cm.Name)
+			return nil, fmt.Errorf("create var_source '%s' error: %w", cm.Name, err)
 		}
-		namedVarsMap[cm.Name] = creds.NewVariables(secrets, p.TeamName(), p.Name(), true)
+		namedVarsMap[cm.Name] = creds.NewVariables(secrets, secretLookupParams, true)
+
 	}
 
 	// If there is no var_source from the pipeline, then just return the global

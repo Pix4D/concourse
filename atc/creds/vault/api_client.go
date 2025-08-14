@@ -1,17 +1,18 @@
 package vault
 
 import (
-	"code.cloudfoundry.org/lager/v3"
 	"crypto/tls"
 	"fmt"
-	"github.com/hashicorp/go-retryablehttp"
-	"github.com/hashicorp/go-rootcerts"
 	"net/http"
 	"os"
 	"path"
 	"strings"
 	"sync/atomic"
 	"time"
+
+	"code.cloudfoundry.org/lager/v3"
+	"github.com/hashicorp/go-retryablehttp"
+	"github.com/hashicorp/go-rootcerts"
 
 	vaultapi "github.com/hashicorp/vault/api"
 )
@@ -183,6 +184,31 @@ func (ac *APIClient) Renew() (time.Duration, error) {
 	logger := ac.logger.Session("renew")
 
 	client := ac.client()
+
+	// Retrieve token information to determine if it is renewable before attempting renewal.
+	tokenInfo, err := client.Auth().Token().LookupSelf()
+	if err != nil {
+		logger.Error("failed-to-lookup-token", err)
+		return time.Second, err
+	}
+
+	if tokenInfo == nil {
+		err := fmt.Errorf("unexpected nil response from Vault during token lookup")
+		logger.Error("vault-token-info-missing", err)
+		return time.Second, err
+	}
+
+	isRenewable, err := tokenInfo.TokenIsRenewable()
+	if err != nil {
+		logger.Error("token-renewable-check-failed", err)
+		return time.Second, err
+	}
+
+	if !isRenewable {
+		ac.renewable = false
+		logger.Info("token-not-renewable")
+		return time.Second, nil
+	}
 
 	secret, err := client.Auth().Token().RenewSelf(0)
 	if err != nil {
