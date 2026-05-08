@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"errors"
 	"fmt"
 	"net/url"
 	"os"
@@ -32,8 +33,9 @@ type ExecuteCommand struct {
 	InputMappings  []flaghelpers.InputMappingPairFlag `short:"m" long:"input-mapping"       value-name:"[NAME=STRING]"    description:"Map a resource to a different name as task input"`
 	InputsFrom     flaghelpers.JobFlag                `short:"j" long:"inputs-from" value-name:"PIPELINE/JOB" description:"A job to base the inputs on"`
 	Outputs        []flaghelpers.OutputPairFlag       `short:"o" long:"output"      value-name:"NAME=PATH"    description:"An output to fetch from the task (can be specified multiple times)"`
-	Image          string                             `long:"image" description:"Image resource for the one-off build"`
+	Image          string                             `long:"image" description:"Name of an input from the job named in --inputs-from to use as the image for the one-off build"`
 	Tags           []string                           `          long:"tag"         value-name:"TAG"          description:"A tag for a specific environment (can be specified multiple times)"`
+	Team           flaghelpers.TeamFlag               `long:"team" description:"Name of the team to run the build in, if different from the target default"`
 	Var            []flaghelpers.VariablePairFlag     `short:"v"  long:"var"       value-name:"[NAME=STRING]"  unquote:"false"  description:"Specify a string value to set for a variable in the pipeline"`
 	YAMLVar        []flaghelpers.YAMLVariablePairFlag `short:"y"  long:"yaml-var"  value-name:"[NAME=YAML]"    unquote:"false"  description:"Specify a YAML value to set for a variable in the pipeline"`
 	VarsFrom       []atc.PathFlag                     `short:"l"  long:"load-vars-from"  description:"Variable flag that can be used for filling in template values in configuration from a YAML file"`
@@ -50,6 +52,16 @@ func (command *ExecuteCommand) Execute(args []string) error {
 		return err
 	}
 
+	var team concourse.Team
+	team, err = command.Team.LoadTeam(target)
+	if err != nil {
+		return err
+	}
+
+	if command.Image != "" && command.InputsFrom.String() == "" {
+		return errors.New("must set --inputs-from when using --image so fly knows which job to look up the image")
+	}
+
 	taskConfig, err := command.CreateTaskConfig(args)
 	if err != nil {
 		return err
@@ -59,7 +71,7 @@ func (command *ExecuteCommand) Execute(args []string) error {
 
 	inputs, inputMappings, imageResource, resourceTypes, err := executehelpers.DetermineInputs(
 		planFactory,
-		target.Team(),
+		team,
 		taskConfig.Inputs,
 		command.Inputs,
 		command.InputMappings,
@@ -116,12 +128,12 @@ func (command *ExecuteCommand) Execute(args []string) error {
 	var buildURL *url.URL
 
 	if command.InputsFrom.PipelineRef.Name != "" {
-		build, err = target.Team().CreatePipelineBuild(command.InputsFrom.PipelineRef, plan)
+		build, err = team.CreatePipelineBuild(command.InputsFrom.PipelineRef, plan)
 		if err != nil {
 			return err
 		}
 	} else {
-		build, err = target.Team().CreateBuild(plan)
+		build, err = team.CreateBuild(plan)
 		if err != nil {
 			return err
 		}
@@ -178,7 +190,7 @@ func (command *ExecuteCommand) Execute(args []string) error {
 		}
 
 		prog.Go("downloading "+output.Name, func(bar *mpb.Bar) error {
-			return executehelpers.Download(bar, target.Team(), artifact.ID, path)
+			return executehelpers.Download(bar, team, artifact.ID, path)
 		})
 	}
 
