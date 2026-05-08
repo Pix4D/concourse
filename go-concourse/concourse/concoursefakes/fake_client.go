@@ -96,6 +96,16 @@ type FakeClient struct {
 		result2 concourse.Pagination
 		result3 error
 	}
+	ClearWallStub        func() error
+	clearWallMutex       sync.RWMutex
+	clearWallArgsForCall []struct {
+	}
+	clearWallReturns struct {
+		result1 error
+	}
+	clearWallReturnsOnCall map[int]struct {
+		result1 error
+	}
 	FindTeamStub        func(string) (concourse.Team, error)
 	findTeamMutex       sync.RWMutex
 	findTeamArgsForCall []struct {
@@ -135,6 +145,18 @@ type FakeClient struct {
 	}
 	getInfoReturnsOnCall map[int]struct {
 		result1 atc.Info
+		result2 error
+	}
+	GetWallStub        func() (atc.Wall, error)
+	getWallMutex       sync.RWMutex
+	getWallArgsForCall []struct {
+	}
+	getWallReturns struct {
+		result1 atc.Wall
+		result2 error
+	}
+	getWallReturnsOnCall map[int]struct {
+		result1 atc.Wall
 		result2 error
 	}
 	HTTPClientStub        func() *http.Client
@@ -196,6 +218,18 @@ type FakeClient struct {
 		result1 []atc.WorkerArtifact
 		result2 error
 	}
+	ListComponentsStub        func() ([]atc.Component, error)
+	listComponentsMutex       sync.RWMutex
+	listComponentsArgsForCall []struct {
+	}
+	listComponentsReturns struct {
+		result1 []atc.Component
+		result2 error
+	}
+	listComponentsReturnsOnCall map[int]struct {
+		result1 []atc.Component
+		result2 error
+	}
 	ListPipelinesStub        func() ([]atc.Pipeline, error)
 	listPipelinesMutex       sync.RWMutex
 	listPipelinesArgsForCall []struct {
@@ -232,6 +266,27 @@ type FakeClient struct {
 		result1 []atc.Worker
 		result2 error
 	}
+	PauseAllComponentsStub        func() error
+	pauseAllComponentsMutex       sync.RWMutex
+	pauseAllComponentsArgsForCall []struct {
+	}
+	pauseAllComponentsReturns struct {
+		result1 error
+	}
+	pauseAllComponentsReturnsOnCall map[int]struct {
+		result1 error
+	}
+	PauseComponentStub        func(string) error
+	pauseComponentMutex       sync.RWMutex
+	pauseComponentArgsForCall []struct {
+		arg1 string
+	}
+	pauseComponentReturns struct {
+		result1 error
+	}
+	pauseComponentReturnsOnCall map[int]struct {
+		result1 error
+	}
 	PruneWorkerStub        func(string) error
 	pruneWorkerMutex       sync.RWMutex
 	pruneWorkerArgsForCall []struct {
@@ -257,6 +312,17 @@ type FakeClient struct {
 		result1 *atc.Worker
 		result2 error
 	}
+	SetWallStub        func(atc.Wall) error
+	setWallMutex       sync.RWMutex
+	setWallArgsForCall []struct {
+		arg1 atc.Wall
+	}
+	setWallReturns struct {
+		result1 error
+	}
+	setWallReturnsOnCall map[int]struct {
+		result1 error
+	}
 	TeamStub        func(string) concourse.Team
 	teamMutex       sync.RWMutex
 	teamArgsForCall []struct {
@@ -278,37 +344,25 @@ type FakeClient struct {
 	uRLReturnsOnCall map[int]struct {
 		result1 string
 	}
-	GetWallStub        func() (atc.Wall, error)
-	getWallMutex       sync.RWMutex
-	getWallArgsForCall []struct {
+	UnpauseAllComponentsStub        func() error
+	unpauseAllComponentsMutex       sync.RWMutex
+	unpauseAllComponentsArgsForCall []struct {
 	}
-	getWallReturns struct {
-		result1 atc.Wall
-		result2 error
-	}
-	getWallReturnsOnCall map[int]struct {
-		result1 atc.Wall
-		result2 error
-	}
-	SetWallStub        func(atc.Wall) error
-	setWallMutex       sync.RWMutex
-	setWallArgsForCall []struct {
-		arg1 atc.Wall
-	}
-	setWallReturns struct {
+	unpauseAllComponentsReturns struct {
 		result1 error
 	}
-	setWallReturnsOnCall map[int]struct {
+	unpauseAllComponentsReturnsOnCall map[int]struct {
 		result1 error
 	}
-	ClearWallStub        func() error
-	clearWallMutex       sync.RWMutex
-	clearWallArgsForCall []struct {
+	UnpauseComponentStub        func(string) error
+	unpauseComponentMutex       sync.RWMutex
+	unpauseComponentArgsForCall []struct {
+		arg1 string
 	}
-	clearWallReturns struct {
+	unpauseComponentReturns struct {
 		result1 error
 	}
-	clearWallReturnsOnCall map[int]struct {
+	unpauseComponentReturnsOnCall map[int]struct {
 		result1 error
 	}
 	UserInfoStub        func() (atc.UserInfo, error)
@@ -720,6 +774,59 @@ func (fake *FakeClient) BuildsReturnsOnCall(i int, result1 []atc.Build, result2 
 	}{result1, result2, result3}
 }
 
+func (fake *FakeClient) ClearWall() error {
+	fake.clearWallMutex.Lock()
+	ret, specificReturn := fake.clearWallReturnsOnCall[len(fake.clearWallArgsForCall)]
+	fake.clearWallArgsForCall = append(fake.clearWallArgsForCall, struct {
+	}{})
+	stub := fake.ClearWallStub
+	fakeReturns := fake.clearWallReturns
+	fake.recordInvocation("ClearWall", []interface{}{})
+	fake.clearWallMutex.Unlock()
+	if stub != nil {
+		return stub()
+	}
+	if specificReturn {
+		return ret.result1
+	}
+	return fakeReturns.result1
+}
+
+func (fake *FakeClient) ClearWallCallCount() int {
+	fake.clearWallMutex.RLock()
+	defer fake.clearWallMutex.RUnlock()
+	return len(fake.clearWallArgsForCall)
+}
+
+func (fake *FakeClient) ClearWallCalls(stub func() error) {
+	fake.clearWallMutex.Lock()
+	defer fake.clearWallMutex.Unlock()
+	fake.ClearWallStub = stub
+}
+
+func (fake *FakeClient) ClearWallReturns(result1 error) {
+	fake.clearWallMutex.Lock()
+	defer fake.clearWallMutex.Unlock()
+	fake.ClearWallStub = nil
+	fake.clearWallReturns = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *FakeClient) ClearWallReturnsOnCall(i int, result1 error) {
+	fake.clearWallMutex.Lock()
+	defer fake.clearWallMutex.Unlock()
+	fake.ClearWallStub = nil
+	if fake.clearWallReturnsOnCall == nil {
+		fake.clearWallReturnsOnCall = make(map[int]struct {
+			result1 error
+		})
+	}
+	fake.clearWallReturnsOnCall[i] = struct {
+		result1 error
+	}{result1}
+}
+
 func (fake *FakeClient) FindTeam(arg1 string) (concourse.Team, error) {
 	fake.findTeamMutex.Lock()
 	ret, specificReturn := fake.findTeamReturnsOnCall[len(fake.findTeamArgsForCall)]
@@ -904,6 +1011,62 @@ func (fake *FakeClient) GetInfoReturnsOnCall(i int, result1 atc.Info, result2 er
 	}
 	fake.getInfoReturnsOnCall[i] = struct {
 		result1 atc.Info
+		result2 error
+	}{result1, result2}
+}
+
+func (fake *FakeClient) GetWall() (atc.Wall, error) {
+	fake.getWallMutex.Lock()
+	ret, specificReturn := fake.getWallReturnsOnCall[len(fake.getWallArgsForCall)]
+	fake.getWallArgsForCall = append(fake.getWallArgsForCall, struct {
+	}{})
+	stub := fake.GetWallStub
+	fakeReturns := fake.getWallReturns
+	fake.recordInvocation("GetWall", []interface{}{})
+	fake.getWallMutex.Unlock()
+	if stub != nil {
+		return stub()
+	}
+	if specificReturn {
+		return ret.result1, ret.result2
+	}
+	return fakeReturns.result1, fakeReturns.result2
+}
+
+func (fake *FakeClient) GetWallCallCount() int {
+	fake.getWallMutex.RLock()
+	defer fake.getWallMutex.RUnlock()
+	return len(fake.getWallArgsForCall)
+}
+
+func (fake *FakeClient) GetWallCalls(stub func() (atc.Wall, error)) {
+	fake.getWallMutex.Lock()
+	defer fake.getWallMutex.Unlock()
+	fake.GetWallStub = stub
+}
+
+func (fake *FakeClient) GetWallReturns(result1 atc.Wall, result2 error) {
+	fake.getWallMutex.Lock()
+	defer fake.getWallMutex.Unlock()
+	fake.GetWallStub = nil
+	fake.getWallReturns = struct {
+		result1 atc.Wall
+		result2 error
+	}{result1, result2}
+}
+
+func (fake *FakeClient) GetWallReturnsOnCall(i int, result1 atc.Wall, result2 error) {
+	fake.getWallMutex.Lock()
+	defer fake.getWallMutex.Unlock()
+	fake.GetWallStub = nil
+	if fake.getWallReturnsOnCall == nil {
+		fake.getWallReturnsOnCall = make(map[int]struct {
+			result1 atc.Wall
+			result2 error
+		})
+	}
+	fake.getWallReturnsOnCall[i] = struct {
+		result1 atc.Wall
 		result2 error
 	}{result1, result2}
 }
@@ -1206,6 +1369,62 @@ func (fake *FakeClient) ListBuildArtifactsReturnsOnCall(i int, result1 []atc.Wor
 	}{result1, result2}
 }
 
+func (fake *FakeClient) ListComponents() ([]atc.Component, error) {
+	fake.listComponentsMutex.Lock()
+	ret, specificReturn := fake.listComponentsReturnsOnCall[len(fake.listComponentsArgsForCall)]
+	fake.listComponentsArgsForCall = append(fake.listComponentsArgsForCall, struct {
+	}{})
+	stub := fake.ListComponentsStub
+	fakeReturns := fake.listComponentsReturns
+	fake.recordInvocation("ListComponents", []interface{}{})
+	fake.listComponentsMutex.Unlock()
+	if stub != nil {
+		return stub()
+	}
+	if specificReturn {
+		return ret.result1, ret.result2
+	}
+	return fakeReturns.result1, fakeReturns.result2
+}
+
+func (fake *FakeClient) ListComponentsCallCount() int {
+	fake.listComponentsMutex.RLock()
+	defer fake.listComponentsMutex.RUnlock()
+	return len(fake.listComponentsArgsForCall)
+}
+
+func (fake *FakeClient) ListComponentsCalls(stub func() ([]atc.Component, error)) {
+	fake.listComponentsMutex.Lock()
+	defer fake.listComponentsMutex.Unlock()
+	fake.ListComponentsStub = stub
+}
+
+func (fake *FakeClient) ListComponentsReturns(result1 []atc.Component, result2 error) {
+	fake.listComponentsMutex.Lock()
+	defer fake.listComponentsMutex.Unlock()
+	fake.ListComponentsStub = nil
+	fake.listComponentsReturns = struct {
+		result1 []atc.Component
+		result2 error
+	}{result1, result2}
+}
+
+func (fake *FakeClient) ListComponentsReturnsOnCall(i int, result1 []atc.Component, result2 error) {
+	fake.listComponentsMutex.Lock()
+	defer fake.listComponentsMutex.Unlock()
+	fake.ListComponentsStub = nil
+	if fake.listComponentsReturnsOnCall == nil {
+		fake.listComponentsReturnsOnCall = make(map[int]struct {
+			result1 []atc.Component
+			result2 error
+		})
+	}
+	fake.listComponentsReturnsOnCall[i] = struct {
+		result1 []atc.Component
+		result2 error
+	}{result1, result2}
+}
+
 func (fake *FakeClient) ListPipelines() ([]atc.Pipeline, error) {
 	fake.listPipelinesMutex.Lock()
 	ret, specificReturn := fake.listPipelinesReturnsOnCall[len(fake.listPipelinesArgsForCall)]
@@ -1374,6 +1593,120 @@ func (fake *FakeClient) ListWorkersReturnsOnCall(i int, result1 []atc.Worker, re
 	}{result1, result2}
 }
 
+func (fake *FakeClient) PauseAllComponents() error {
+	fake.pauseAllComponentsMutex.Lock()
+	ret, specificReturn := fake.pauseAllComponentsReturnsOnCall[len(fake.pauseAllComponentsArgsForCall)]
+	fake.pauseAllComponentsArgsForCall = append(fake.pauseAllComponentsArgsForCall, struct {
+	}{})
+	stub := fake.PauseAllComponentsStub
+	fakeReturns := fake.pauseAllComponentsReturns
+	fake.recordInvocation("PauseAllComponents", []interface{}{})
+	fake.pauseAllComponentsMutex.Unlock()
+	if stub != nil {
+		return stub()
+	}
+	if specificReturn {
+		return ret.result1
+	}
+	return fakeReturns.result1
+}
+
+func (fake *FakeClient) PauseAllComponentsCallCount() int {
+	fake.pauseAllComponentsMutex.RLock()
+	defer fake.pauseAllComponentsMutex.RUnlock()
+	return len(fake.pauseAllComponentsArgsForCall)
+}
+
+func (fake *FakeClient) PauseAllComponentsCalls(stub func() error) {
+	fake.pauseAllComponentsMutex.Lock()
+	defer fake.pauseAllComponentsMutex.Unlock()
+	fake.PauseAllComponentsStub = stub
+}
+
+func (fake *FakeClient) PauseAllComponentsReturns(result1 error) {
+	fake.pauseAllComponentsMutex.Lock()
+	defer fake.pauseAllComponentsMutex.Unlock()
+	fake.PauseAllComponentsStub = nil
+	fake.pauseAllComponentsReturns = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *FakeClient) PauseAllComponentsReturnsOnCall(i int, result1 error) {
+	fake.pauseAllComponentsMutex.Lock()
+	defer fake.pauseAllComponentsMutex.Unlock()
+	fake.PauseAllComponentsStub = nil
+	if fake.pauseAllComponentsReturnsOnCall == nil {
+		fake.pauseAllComponentsReturnsOnCall = make(map[int]struct {
+			result1 error
+		})
+	}
+	fake.pauseAllComponentsReturnsOnCall[i] = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *FakeClient) PauseComponent(arg1 string) error {
+	fake.pauseComponentMutex.Lock()
+	ret, specificReturn := fake.pauseComponentReturnsOnCall[len(fake.pauseComponentArgsForCall)]
+	fake.pauseComponentArgsForCall = append(fake.pauseComponentArgsForCall, struct {
+		arg1 string
+	}{arg1})
+	stub := fake.PauseComponentStub
+	fakeReturns := fake.pauseComponentReturns
+	fake.recordInvocation("PauseComponent", []interface{}{arg1})
+	fake.pauseComponentMutex.Unlock()
+	if stub != nil {
+		return stub(arg1)
+	}
+	if specificReturn {
+		return ret.result1
+	}
+	return fakeReturns.result1
+}
+
+func (fake *FakeClient) PauseComponentCallCount() int {
+	fake.pauseComponentMutex.RLock()
+	defer fake.pauseComponentMutex.RUnlock()
+	return len(fake.pauseComponentArgsForCall)
+}
+
+func (fake *FakeClient) PauseComponentCalls(stub func(string) error) {
+	fake.pauseComponentMutex.Lock()
+	defer fake.pauseComponentMutex.Unlock()
+	fake.PauseComponentStub = stub
+}
+
+func (fake *FakeClient) PauseComponentArgsForCall(i int) string {
+	fake.pauseComponentMutex.RLock()
+	defer fake.pauseComponentMutex.RUnlock()
+	argsForCall := fake.pauseComponentArgsForCall[i]
+	return argsForCall.arg1
+}
+
+func (fake *FakeClient) PauseComponentReturns(result1 error) {
+	fake.pauseComponentMutex.Lock()
+	defer fake.pauseComponentMutex.Unlock()
+	fake.PauseComponentStub = nil
+	fake.pauseComponentReturns = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *FakeClient) PauseComponentReturnsOnCall(i int, result1 error) {
+	fake.pauseComponentMutex.Lock()
+	defer fake.pauseComponentMutex.Unlock()
+	fake.PauseComponentStub = nil
+	if fake.pauseComponentReturnsOnCall == nil {
+		fake.pauseComponentReturnsOnCall = make(map[int]struct {
+			result1 error
+		})
+	}
+	fake.pauseComponentReturnsOnCall[i] = struct {
+		result1 error
+	}{result1}
+}
+
 func (fake *FakeClient) PruneWorker(arg1 string) error {
 	fake.pruneWorkerMutex.Lock()
 	ret, specificReturn := fake.pruneWorkerReturnsOnCall[len(fake.pruneWorkerArgsForCall)]
@@ -1500,6 +1833,67 @@ func (fake *FakeClient) SaveWorkerReturnsOnCall(i int, result1 *atc.Worker, resu
 	}{result1, result2}
 }
 
+func (fake *FakeClient) SetWall(arg1 atc.Wall) error {
+	fake.setWallMutex.Lock()
+	ret, specificReturn := fake.setWallReturnsOnCall[len(fake.setWallArgsForCall)]
+	fake.setWallArgsForCall = append(fake.setWallArgsForCall, struct {
+		arg1 atc.Wall
+	}{arg1})
+	stub := fake.SetWallStub
+	fakeReturns := fake.setWallReturns
+	fake.recordInvocation("SetWall", []interface{}{arg1})
+	fake.setWallMutex.Unlock()
+	if stub != nil {
+		return stub(arg1)
+	}
+	if specificReturn {
+		return ret.result1
+	}
+	return fakeReturns.result1
+}
+
+func (fake *FakeClient) SetWallCallCount() int {
+	fake.setWallMutex.RLock()
+	defer fake.setWallMutex.RUnlock()
+	return len(fake.setWallArgsForCall)
+}
+
+func (fake *FakeClient) SetWallCalls(stub func(atc.Wall) error) {
+	fake.setWallMutex.Lock()
+	defer fake.setWallMutex.Unlock()
+	fake.SetWallStub = stub
+}
+
+func (fake *FakeClient) SetWallArgsForCall(i int) atc.Wall {
+	fake.setWallMutex.RLock()
+	defer fake.setWallMutex.RUnlock()
+	argsForCall := fake.setWallArgsForCall[i]
+	return argsForCall.arg1
+}
+
+func (fake *FakeClient) SetWallReturns(result1 error) {
+	fake.setWallMutex.Lock()
+	defer fake.setWallMutex.Unlock()
+	fake.SetWallStub = nil
+	fake.setWallReturns = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *FakeClient) SetWallReturnsOnCall(i int, result1 error) {
+	fake.setWallMutex.Lock()
+	defer fake.setWallMutex.Unlock()
+	fake.SetWallStub = nil
+	if fake.setWallReturnsOnCall == nil {
+		fake.setWallReturnsOnCall = make(map[int]struct {
+			result1 error
+		})
+	}
+	fake.setWallReturnsOnCall[i] = struct {
+		result1 error
+	}{result1}
+}
+
 func (fake *FakeClient) Team(arg1 string) concourse.Team {
 	fake.teamMutex.Lock()
 	ret, specificReturn := fake.teamReturnsOnCall[len(fake.teamArgsForCall)]
@@ -1614,6 +2008,120 @@ func (fake *FakeClient) URLReturnsOnCall(i int, result1 string) {
 	}{result1}
 }
 
+func (fake *FakeClient) UnpauseAllComponents() error {
+	fake.unpauseAllComponentsMutex.Lock()
+	ret, specificReturn := fake.unpauseAllComponentsReturnsOnCall[len(fake.unpauseAllComponentsArgsForCall)]
+	fake.unpauseAllComponentsArgsForCall = append(fake.unpauseAllComponentsArgsForCall, struct {
+	}{})
+	stub := fake.UnpauseAllComponentsStub
+	fakeReturns := fake.unpauseAllComponentsReturns
+	fake.recordInvocation("UnpauseAllComponents", []interface{}{})
+	fake.unpauseAllComponentsMutex.Unlock()
+	if stub != nil {
+		return stub()
+	}
+	if specificReturn {
+		return ret.result1
+	}
+	return fakeReturns.result1
+}
+
+func (fake *FakeClient) UnpauseAllComponentsCallCount() int {
+	fake.unpauseAllComponentsMutex.RLock()
+	defer fake.unpauseAllComponentsMutex.RUnlock()
+	return len(fake.unpauseAllComponentsArgsForCall)
+}
+
+func (fake *FakeClient) UnpauseAllComponentsCalls(stub func() error) {
+	fake.unpauseAllComponentsMutex.Lock()
+	defer fake.unpauseAllComponentsMutex.Unlock()
+	fake.UnpauseAllComponentsStub = stub
+}
+
+func (fake *FakeClient) UnpauseAllComponentsReturns(result1 error) {
+	fake.unpauseAllComponentsMutex.Lock()
+	defer fake.unpauseAllComponentsMutex.Unlock()
+	fake.UnpauseAllComponentsStub = nil
+	fake.unpauseAllComponentsReturns = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *FakeClient) UnpauseAllComponentsReturnsOnCall(i int, result1 error) {
+	fake.unpauseAllComponentsMutex.Lock()
+	defer fake.unpauseAllComponentsMutex.Unlock()
+	fake.UnpauseAllComponentsStub = nil
+	if fake.unpauseAllComponentsReturnsOnCall == nil {
+		fake.unpauseAllComponentsReturnsOnCall = make(map[int]struct {
+			result1 error
+		})
+	}
+	fake.unpauseAllComponentsReturnsOnCall[i] = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *FakeClient) UnpauseComponent(arg1 string) error {
+	fake.unpauseComponentMutex.Lock()
+	ret, specificReturn := fake.unpauseComponentReturnsOnCall[len(fake.unpauseComponentArgsForCall)]
+	fake.unpauseComponentArgsForCall = append(fake.unpauseComponentArgsForCall, struct {
+		arg1 string
+	}{arg1})
+	stub := fake.UnpauseComponentStub
+	fakeReturns := fake.unpauseComponentReturns
+	fake.recordInvocation("UnpauseComponent", []interface{}{arg1})
+	fake.unpauseComponentMutex.Unlock()
+	if stub != nil {
+		return stub(arg1)
+	}
+	if specificReturn {
+		return ret.result1
+	}
+	return fakeReturns.result1
+}
+
+func (fake *FakeClient) UnpauseComponentCallCount() int {
+	fake.unpauseComponentMutex.RLock()
+	defer fake.unpauseComponentMutex.RUnlock()
+	return len(fake.unpauseComponentArgsForCall)
+}
+
+func (fake *FakeClient) UnpauseComponentCalls(stub func(string) error) {
+	fake.unpauseComponentMutex.Lock()
+	defer fake.unpauseComponentMutex.Unlock()
+	fake.UnpauseComponentStub = stub
+}
+
+func (fake *FakeClient) UnpauseComponentArgsForCall(i int) string {
+	fake.unpauseComponentMutex.RLock()
+	defer fake.unpauseComponentMutex.RUnlock()
+	argsForCall := fake.unpauseComponentArgsForCall[i]
+	return argsForCall.arg1
+}
+
+func (fake *FakeClient) UnpauseComponentReturns(result1 error) {
+	fake.unpauseComponentMutex.Lock()
+	defer fake.unpauseComponentMutex.Unlock()
+	fake.UnpauseComponentStub = nil
+	fake.unpauseComponentReturns = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *FakeClient) UnpauseComponentReturnsOnCall(i int, result1 error) {
+	fake.unpauseComponentMutex.Lock()
+	defer fake.unpauseComponentMutex.Unlock()
+	fake.UnpauseComponentStub = nil
+	if fake.unpauseComponentReturnsOnCall == nil {
+		fake.unpauseComponentReturnsOnCall = make(map[int]struct {
+			result1 error
+		})
+	}
+	fake.unpauseComponentReturnsOnCall[i] = struct {
+		result1 error
+	}{result1}
+}
+
 func (fake *FakeClient) UserInfo() (atc.UserInfo, error) {
 	fake.userInfoMutex.Lock()
 	ret, specificReturn := fake.userInfoReturnsOnCall[len(fake.userInfoArgsForCall)]
@@ -1670,213 +2178,9 @@ func (fake *FakeClient) UserInfoReturnsOnCall(i int, result1 atc.UserInfo, resul
 	}{result1, result2}
 }
 
-func (fake *FakeClient) GetWall() (atc.Wall, error) {
-	fake.getWallMutex.Lock()
-	ret, specificReturn := fake.getWallReturnsOnCall[len(fake.getWallArgsForCall)]
-	fake.getWallArgsForCall = append(fake.getWallArgsForCall, struct{}{})
-	stub := fake.GetWallStub
-	fakeReturns := fake.getWallReturns
-	fake.recordInvocation("GetWall", []interface{}{})
-	fake.getWallMutex.Unlock()
-	if stub != nil {
-		return stub()
-	}
-	if specificReturn {
-		return ret.result1, ret.result2
-	}
-	return fakeReturns.result1, fakeReturns.result2
-}
-
-func (fake *FakeClient) GetWallCallCount() int {
-	fake.getWallMutex.RLock()
-	defer fake.getWallMutex.RUnlock()
-	return len(fake.getWallArgsForCall)
-}
-
-func (fake *FakeClient) GetWallCalls(stub func() (atc.Wall, error)) {
-	fake.getWallMutex.Lock()
-	defer fake.getWallMutex.Unlock()
-	fake.GetWallStub = stub
-}
-
-func (fake *FakeClient) GetWallReturns(result1 atc.Wall, result2 error) {
-	fake.getWallMutex.Lock()
-	defer fake.getWallMutex.Unlock()
-	fake.GetWallStub = nil
-	fake.getWallReturns = struct {
-		result1 atc.Wall
-		result2 error
-	}{result1, result2}
-}
-
-func (fake *FakeClient) GetWallReturnsOnCall(i int, result1 atc.Wall, result2 error) {
-	fake.getWallMutex.Lock()
-	defer fake.getWallMutex.Unlock()
-	fake.GetWallStub = nil
-	if fake.getWallReturnsOnCall == nil {
-		fake.getWallReturnsOnCall = make(map[int]struct {
-			result1 atc.Wall
-			result2 error
-		})
-	}
-	fake.getWallReturnsOnCall[i] = struct {
-		result1 atc.Wall
-		result2 error
-	}{result1, result2}
-}
-
-func (fake *FakeClient) SetWall(arg1 atc.Wall) error {
-	fake.setWallMutex.Lock()
-	ret, specificReturn := fake.setWallReturnsOnCall[len(fake.setWallArgsForCall)]
-	fake.setWallArgsForCall = append(fake.setWallArgsForCall, struct{ arg1 atc.Wall }{arg1})
-	stub := fake.SetWallStub
-	fakeReturns := fake.setWallReturns
-	fake.recordInvocation("SetWall", []interface{}{arg1})
-	fake.setWallMutex.Unlock()
-	if stub != nil {
-		return stub(arg1)
-	}
-	if specificReturn {
-		return ret.result1
-	}
-	return fakeReturns.result1
-}
-
-func (fake *FakeClient) SetWallCallCount() int {
-	fake.setWallMutex.RLock()
-	defer fake.setWallMutex.RUnlock()
-	return len(fake.setWallArgsForCall)
-}
-
-func (fake *FakeClient) SetWallCalls(stub func(atc.Wall) error) {
-	fake.setWallMutex.Lock()
-	defer fake.setWallMutex.Unlock()
-	fake.SetWallStub = stub
-}
-
-func (fake *FakeClient) SetWallArgsForCall(i int) atc.Wall {
-	fake.setWallMutex.RLock()
-	defer fake.setWallMutex.RUnlock()
-	argsForCall := fake.setWallArgsForCall[i]
-	return argsForCall.arg1
-}
-
-func (fake *FakeClient) SetWallReturns(result1 error) {
-	fake.setWallMutex.Lock()
-	defer fake.setWallMutex.Unlock()
-	fake.SetWallStub = nil
-	fake.setWallReturns = struct{ result1 error }{result1}
-}
-
-func (fake *FakeClient) SetWallReturnsOnCall(i int, result1 error) {
-	fake.setWallMutex.Lock()
-	defer fake.setWallMutex.Unlock()
-	fake.SetWallStub = nil
-	if fake.setWallReturnsOnCall == nil {
-		fake.setWallReturnsOnCall = make(map[int]struct{ result1 error })
-	}
-	fake.setWallReturnsOnCall[i] = struct{ result1 error }{result1}
-}
-
-func (fake *FakeClient) ClearWall() error {
-	fake.clearWallMutex.Lock()
-	ret, specificReturn := fake.clearWallReturnsOnCall[len(fake.clearWallArgsForCall)]
-	fake.clearWallArgsForCall = append(fake.clearWallArgsForCall, struct{}{})
-	stub := fake.ClearWallStub
-	fakeReturns := fake.clearWallReturns
-	fake.recordInvocation("ClearWall", []interface{}{})
-	fake.clearWallMutex.Unlock()
-	if stub != nil {
-		return stub()
-	}
-	if specificReturn {
-		return ret.result1
-	}
-	return fakeReturns.result1
-}
-
-func (fake *FakeClient) ClearWallCallCount() int {
-	fake.clearWallMutex.RLock()
-	defer fake.clearWallMutex.RUnlock()
-	return len(fake.clearWallArgsForCall)
-}
-
-func (fake *FakeClient) ClearWallCalls(stub func() error) {
-	fake.clearWallMutex.Lock()
-	defer fake.clearWallMutex.Unlock()
-	fake.ClearWallStub = stub
-}
-
-func (fake *FakeClient) ClearWallReturns(result1 error) {
-	fake.clearWallMutex.Lock()
-	defer fake.clearWallMutex.Unlock()
-	fake.ClearWallStub = nil
-	fake.clearWallReturns = struct{ result1 error }{result1}
-}
-
-func (fake *FakeClient) ClearWallReturnsOnCall(i int, result1 error) {
-	fake.clearWallMutex.Lock()
-	defer fake.clearWallMutex.Unlock()
-	fake.ClearWallStub = nil
-	if fake.clearWallReturnsOnCall == nil {
-		fake.clearWallReturnsOnCall = make(map[int]struct{ result1 error })
-	}
-	fake.clearWallReturnsOnCall[i] = struct{ result1 error }{result1}
-}
-
 func (fake *FakeClient) Invocations() map[string][][]interface{} {
 	fake.invocationsMutex.RLock()
 	defer fake.invocationsMutex.RUnlock()
-	fake.abortBuildMutex.RLock()
-	defer fake.abortBuildMutex.RUnlock()
-	fake.buildMutex.RLock()
-	defer fake.buildMutex.RUnlock()
-	fake.buildEventsMutex.RLock()
-	defer fake.buildEventsMutex.RUnlock()
-	fake.buildPlanMutex.RLock()
-	defer fake.buildPlanMutex.RUnlock()
-	fake.buildResourcesMutex.RLock()
-	defer fake.buildResourcesMutex.RUnlock()
-	fake.buildsMutex.RLock()
-	defer fake.buildsMutex.RUnlock()
-	fake.findTeamMutex.RLock()
-	defer fake.findTeamMutex.RUnlock()
-	fake.getCLIReaderMutex.RLock()
-	defer fake.getCLIReaderMutex.RUnlock()
-	fake.getInfoMutex.RLock()
-	defer fake.getInfoMutex.RUnlock()
-	fake.hTTPClientMutex.RLock()
-	defer fake.hTTPClientMutex.RUnlock()
-	fake.landWorkerMutex.RLock()
-	defer fake.landWorkerMutex.RUnlock()
-	fake.listActiveUsersSinceMutex.RLock()
-	defer fake.listActiveUsersSinceMutex.RUnlock()
-	fake.listAllJobsMutex.RLock()
-	defer fake.listAllJobsMutex.RUnlock()
-	fake.listBuildArtifactsMutex.RLock()
-	defer fake.listBuildArtifactsMutex.RUnlock()
-	fake.listPipelinesMutex.RLock()
-	defer fake.listPipelinesMutex.RUnlock()
-	fake.listTeamsMutex.RLock()
-	defer fake.listTeamsMutex.RUnlock()
-	fake.listWorkersMutex.RLock()
-	defer fake.listWorkersMutex.RUnlock()
-	fake.pruneWorkerMutex.RLock()
-	defer fake.pruneWorkerMutex.RUnlock()
-	fake.saveWorkerMutex.RLock()
-	defer fake.saveWorkerMutex.RUnlock()
-	fake.teamMutex.RLock()
-	defer fake.teamMutex.RUnlock()
-	fake.uRLMutex.RLock()
-	defer fake.uRLMutex.RUnlock()
-	fake.getWallMutex.RLock()
-	defer fake.getWallMutex.RUnlock()
-	fake.setWallMutex.RLock()
-	defer fake.setWallMutex.RUnlock()
-	fake.clearWallMutex.RLock()
-	defer fake.clearWallMutex.RUnlock()
-	fake.userInfoMutex.RLock()
-	defer fake.userInfoMutex.RUnlock()
 	copiedInvocations := map[string][][]interface{}{}
 	for key, value := range fake.invocations {
 		copiedInvocations[key] = value
