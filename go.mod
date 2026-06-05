@@ -1,6 +1,6 @@
 module github.com/concourse/concourse
 
-go 1.26.2
+go 1.26.3
 
 require (
 	charm.land/bubbles/v2 v2.1.0
@@ -25,11 +25,11 @@ require (
 	github.com/caarlos0/env/v11 v11.4.0
 	github.com/cenkalti/backoff v2.2.1+incompatible
 	github.com/cenkalti/backoff/v5 v5.0.3
-	github.com/concourse/dex v1.13.0
+	github.com/concourse/dex v1.14.0
 	github.com/concourse/houdini v1.3.0
 	github.com/concourse/retryhttp v1.3.0
-	github.com/containerd/containerd/api v1.11.0
-	github.com/containerd/containerd/v2 v2.3.0
+	github.com/containerd/containerd/api v1.11.1
+	github.com/containerd/containerd/v2 v2.3.1
 	github.com/containerd/errdefs v1.0.0
 	github.com/containerd/go-cni v1.1.13
 	github.com/containerd/typeurl/v2 v2.2.3
@@ -92,10 +92,10 @@ require (
 	go.opentelemetry.io/otel/trace v1.43.0
 	go.yaml.in/yaml/v2 v2.4.4
 	go.yaml.in/yaml/v3 v3.0.4
-	golang.org/x/crypto v0.50.0
+	golang.org/x/crypto v0.52.0
 	golang.org/x/oauth2 v0.36.0
 	golang.org/x/sync v0.20.0
-	golang.org/x/sys v0.43.0
+	golang.org/x/sys v0.45.0
 	golang.org/x/time v0.15.0
 	google.golang.org/grpc v1.80.0
 	k8s.io/api v0.36.0
@@ -165,9 +165,9 @@ require (
 	go.opencensus.io v0.24.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.10.0 // indirect
 	golang.org/x/mod v0.35.0 // indirect
-	golang.org/x/net v0.53.0 // indirect
-	golang.org/x/term v0.42.0
-	golang.org/x/text v0.36.0 // indirect
+	golang.org/x/net v0.54.0 // indirect
+	golang.org/x/term v0.43.0
+	golang.org/x/text v0.37.0 // indirect
 	golang.org/x/tools v0.44.0 // indirect
 	google.golang.org/api v0.277.0 // indirect
 	google.golang.org/protobuf v1.36.12-0.20260120151049-f2248ac996af // indirect
