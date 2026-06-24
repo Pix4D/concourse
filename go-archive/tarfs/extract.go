@@ -128,7 +128,10 @@ func extractEntry(root *os.Root, header *tar.Header, input io.Reader, chown bool
 			}
 		}
 
-		err = root.Symlink(header.Linkname, filePath)
+		// Workaround for https://github.com/golang/go/issues/80073: os.Root.Symlink does
+		// not normalize path separators on Windows, so Unix-style tar link targets must
+		// be converted before creating the reparse point.
+		err = root.Symlink(filepath.FromSlash(header.Linkname), filePath)
 		if err != nil {
 			return err
 		}
