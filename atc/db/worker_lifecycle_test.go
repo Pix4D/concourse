@@ -102,6 +102,68 @@ var _ = Describe("Worker Lifecycle", func() {
 		})
 	})
 
+	Describe("DeleteStalledWorkers", func() {
+		Context("when there is a stalled worker", func() {
+			var stalledTimeout time.Duration
+
+			BeforeEach(func() {
+				stalledTimeout = 2 * time.Second
+
+				By("setting the worker's expiration 1m in the past", func() {
+					_, err := workerFactory.SaveWorker(atcWorker, -1*time.Minute)
+					Expect(err).ToNot(HaveOccurred())
+				})
+
+				stalledWorkers, err := workerLifecycle.StallUnresponsiveWorkers()
+				Expect(err).ToNot(HaveOccurred())
+				Expect(stalledWorkers).To(ConsistOf("some-name"))
+			})
+
+			Context("when the worker has been stalled for less than the timeout", func() {
+				It("leaves the worker alone", func() {
+					deletedWorkers, err := workerLifecycle.DeleteStalledWorkers(stalledTimeout)
+					Expect(err).ToNot(HaveOccurred())
+					Expect(deletedWorkers).To(BeEmpty())
+				})
+			})
+
+			Context("when the worker has been stalled for longer than the timeout", func() {
+				It("deletes the stalled worker", func() {
+					By("waiting for the timeout to elapse", func() {
+						time.Sleep(stalledTimeout + time.Second)
+					})
+					deletedWorkers, err := workerLifecycle.DeleteStalledWorkers(stalledTimeout)
+					Expect(err).ToNot(HaveOccurred())
+					Expect(deletedWorkers).To(ConsistOf("some-name"))
+				})
+			})
+
+			Context("when the worker heartbeats again before the timeout", func() {
+				It("clears the stall and leaves the worker alone", func() {
+					_, err := workerFactory.HeartbeatWorker(atcWorker, 5*time.Minute)
+					Expect(err).ToNot(HaveOccurred())
+
+					deletedWorkers, err := workerLifecycle.DeleteStalledWorkers(stalledTimeout)
+					Expect(err).ToNot(HaveOccurred())
+					Expect(deletedWorkers).To(BeEmpty())
+				})
+			})
+		})
+
+		Context("when the worker is running", func() {
+			BeforeEach(func() {
+				_, err := workerFactory.SaveWorker(atcWorker, 5*time.Minute)
+				Expect(err).ToNot(HaveOccurred())
+			})
+
+			It("leaves the worker alone", func() {
+				deletedWorkers, err := workerLifecycle.DeleteStalledWorkers(-1 * time.Hour)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(deletedWorkers).To(BeEmpty())
+			})
+		})
+	})
+
 	Describe("DeleteFinishedRetiringWorkers", func() {
 		var (
 			dbWorker db.Worker
