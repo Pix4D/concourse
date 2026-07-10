@@ -16,6 +16,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/concourse/concourse/go-archive/archivetest"
 	"github.com/concourse/concourse/go-archive/tarfs"
 	"github.com/klauspost/compress/zstd"
 	. "github.com/onsi/ginkgo/v2"
@@ -412,6 +413,98 @@ var _ = Describe("Volume Server", func() {
 			recorder := httptest.NewRecorder()
 			handler.ServeHTTP(recorder, request)
 			Expect(recorder.Code).To(Equal(404))
+		})
+
+		// Regression tests for #9597 and #9609: relative symlinks must not escape
+		// the extraction directory and must resolve correctly on Windows.
+		Context("when the tar stream contains symlinks", func() {
+			buildGzipArchive := func(files archivetest.Archive) *bytes.Buffer {
+				src, err := files.TarGZStream()
+				Expect(err).NotTo(HaveOccurred())
+
+				buf := new(bytes.Buffer)
+				_, err = io.Copy(buf, src)
+				Expect(err).NotTo(HaveOccurred())
+
+				return buf
+			}
+
+			It("streams in a relative file symlink", func() {
+				files := archivetest.Archive{
+					{
+						Name: "target/file",
+						Body: "file-content",
+					},
+					{
+						Name: "links/file-link",
+						Link: "../target/file",
+						Mode: 0755,
+					},
+				}
+
+				request, _ := http.NewRequest("PUT", fmt.Sprintf("/volumes/%s/stream-in?path=%s", myVolume.Handle, "dest-path"), buildGzipArchive(files))
+				request.Header.Set("Content-Encoding", string(baggageclaim.GzipEncoding))
+				recorder := httptest.NewRecorder()
+				handler.ServeHTTP(recorder, request)
+				Expect(recorder.Code).To(Equal(204), "expected stream-in to succeed, got: %s", recorder.Body.String())
+
+				// A successful stream-in is not enough; the link must be readable on the worker's OS.
+				symlinkedFile := filepath.Join(volumeDir, "live", myVolume.Handle, "volume", "dest-path", "links", "file-link")
+				contents, err := os.ReadFile(symlinkedFile)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(string(contents)).To(Equal("file-content"))
+			})
+
+			It("streams in a relative directory symlink", func() {
+				// Directory symlinks exercise Windows' robocopy-based COW path.
+				files := archivetest.Archive{
+					{
+						Name: "target/file",
+						Body: "file-content",
+					},
+					{
+						Name: "links/directory-link",
+						Link: "../target",
+						Mode: 0755,
+					},
+				}
+
+				request, _ := http.NewRequest("PUT", fmt.Sprintf("/volumes/%s/stream-in?path=%s", myVolume.Handle, "dest-path"), buildGzipArchive(files))
+				request.Header.Set("Content-Encoding", string(baggageclaim.GzipEncoding))
+				recorder := httptest.NewRecorder()
+				handler.ServeHTTP(recorder, request)
+				Expect(recorder.Code).To(Equal(204), "expected stream-in to succeed, got: %s", recorder.Body.String())
+
+				// A successful stream-in is not enough; the link must be readable on the worker's OS.
+				symlinkedFile := filepath.Join(volumeDir, "live", myVolume.Handle, "volume", "dest-path", "links", "directory-link", "file")
+				contents, err := os.ReadFile(symlinkedFile)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(string(contents)).To(Equal("file-content"))
+			})
+
+			It("rejects a symlink that escapes the destination", func() {
+				if runtime.GOOS != "windows" {
+					// Other platforms may use the system tar instead of tarfs.
+					Skip("symlink breakout protection is only reliably exercised on Windows")
+				}
+
+				files := archivetest.Archive{
+					{
+						Name: "escaping-link",
+						Link: "../../outside-file",
+						Mode: 0755,
+					},
+				}
+
+				request, _ := http.NewRequest("PUT", fmt.Sprintf("/volumes/%s/stream-in?path=%s", myVolume.Handle, "dest-path"), buildGzipArchive(files))
+				request.Header.Set("Content-Encoding", string(baggageclaim.GzipEncoding))
+				recorder := httptest.NewRecorder()
+				handler.ServeHTTP(recorder, request)
+				Expect(recorder.Code).To(Equal(400))
+
+				escapingLinkPath := filepath.Join(volumeDir, "live", myVolume.Handle, "volume", "dest-path", "escaping-link")
+				Expect(escapingLinkPath).ToNot(BeAnExistingFile())
+			})
 		})
 	})
 
