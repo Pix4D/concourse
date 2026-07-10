@@ -204,6 +204,11 @@ type RunCommand struct {
 		ClientSecret            string `long:"client-secret" required:"true" description:"Client secret to use for login flow"`
 	} `group:"Web Server"`
 
+	Health struct {
+		MinWorkerCount           int     `long:"health-min-worker-count" default:"1" description:"Minimum number of running workers before the health endpoint reports degraded. Setting this to 0 means the endpoint will only report healthy or failing — never degraded."`
+		ComponentStaleMultiplier float64 `long:"health-component-stale-multiplier" default:"2.0" description:"A component is considered stale when it has not run for more than this multiplier times its interval. Stale runtime components (scheduler, tracker, scanner) cause degraded status."`
+	} `group:"Health Endpoint"`
+
 	LogDBQueries   bool `long:"log-db-queries" description:"Log database queries."`
 	LogClusterName bool `long:"log-cluster-name" description:"Log cluster name."`
 
@@ -217,6 +222,8 @@ type RunCommand struct {
 		CheckRecyclePeriod     time.Duration `long:"check-recycle-period" default:"1m" description:"Period after which to reap checks that are completed."`
 		VarSourceRecyclePeriod time.Duration `long:"var-source-recycle-period" default:"5m" description:"Period after which to reap var_sources that are not used."`
 	} `group:"Garbage Collection" namespace:"gc"`
+
+	StalledWorkerTimeout time.Duration `long:"stalled-worker-timeout" default:"0s" description:"Period after which stalled (unresponsive, non-ephemeral) workers will be automatically pruned along with their cache state. 0s (the default) means stalled workers are never automatically pruned and must be removed manually with 'fly prune-worker'."`
 
 	BuildTrackerInterval time.Duration `long:"build-tracker-interval" default:"10s" description:"Interval on which to run build tracking."`
 
@@ -952,6 +959,7 @@ func (cmd *RunCommand) constructAPIMembers(
 		dbResourceConfigFactory,
 		userFactory,
 		dbComponentFactory,
+		dbConn,
 		pool,
 		secretManager,
 		credsManagers,
@@ -1391,7 +1399,7 @@ func (cmd *RunCommand) gcComponents(
 
 	collectors := map[string]component.Runnable{
 		atc.ComponentCollectorBuilds:            gc.NewBuildCollector(dbBuildFactory),
-		atc.ComponentCollectorWorkers:           gc.NewWorkerCollector(dbWorkerLifecycle),
+		atc.ComponentCollectorWorkers:           gc.NewWorkerCollector(dbWorkerLifecycle, cmd.StalledWorkerTimeout),
 		atc.ComponentCollectorResourceConfigs:   gc.NewResourceConfigCollector(dbResourceConfigFactory, unreferencedConfigGracePeriod),
 		atc.ComponentCollectorResourceCaches:    gc.NewResourceCacheCollector(dbResourceCacheLifecycle),
 		atc.ComponentCollectorTaskCaches:        gc.NewTaskCacheCollector(dbTaskCacheLifecycle),
@@ -2073,6 +2081,7 @@ func (cmd *RunCommand) constructAPIHandler(
 	resourceConfigFactory db.ResourceConfigFactory,
 	dbUserFactory db.UserFactory,
 	dbComponentFactory db.ComponentFactory,
+	dbConn db.DbConn,
 	workerPool worker.Pool,
 	secretManager creds.Secrets,
 	credsManagers creds.Managers,
@@ -2152,6 +2161,9 @@ func (cmd *RunCommand) constructAPIHandler(
 		resourceConfigFactory,
 		dbUserFactory,
 		dbComponentFactory,
+		dbConn,
+		cmd.Health.MinWorkerCount,
+		cmd.Health.ComponentStaleMultiplier,
 
 		buildserver.NewEventHandler,
 
