@@ -230,7 +230,9 @@ var _ = Describe("ExtractEntry", func() {
 
 			l, err := os.Readlink(filepath.Join(dest, "abs"))
 			Expect(err).ToNot(HaveOccurred())
-			Expect(l).To(Equal(header.Linkname))
+			// Windows returns symlink targets with native separators; normalize
+			// them to the slash-separated form stored in tar headers.
+			Expect(filepath.ToSlash(l)).To(Equal(header.Linkname))
 		})
 
 		It("returns a BreakoutErr when a symlink points outside the destination", func() {
