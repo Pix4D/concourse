@@ -1,6 +1,7 @@
 package engine_test
 
 import (
+	"errors"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -33,6 +34,7 @@ var _ = Describe("PutDelegate", func() {
 		delegate   exec.PutDelegate
 		info       resource.VersionResult
 		exitStatus exec.ExitStatus
+		saveErr    error
 	)
 
 	BeforeEach(func() {
@@ -88,7 +90,7 @@ var _ = Describe("PutDelegate", func() {
 			resourceCache = new(dbfakes.FakeResourceCache)
 			resourceCache.IDReturns(123)
 
-			delegate.SaveOutput(logger, plan, source, resourceCache, info)
+			saveErr = delegate.SaveOutput(logger, plan, source, resourceCache, info)
 		})
 
 		It("saves the build output", func() {
@@ -101,6 +103,18 @@ var _ = Describe("PutDelegate", func() {
 			Expect(metadata).To(Equal(db.NewResourceConfigMetadataFields(info.Metadata)))
 			Expect(name).To(Equal(plan.Name))
 			Expect(resource).To(Equal(plan.Resource))
+		})
+
+		Context("when saving the build output fails", func() {
+			disaster := errors.New("nope")
+
+			BeforeEach(func() {
+				fakeBuild.SaveOutputReturns(disaster)
+			})
+
+			It("returns the error", func() {
+				Expect(saveErr).To(MatchError(disaster))
+			})
 		})
 	})
 })
