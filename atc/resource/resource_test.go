@@ -3,6 +3,8 @@ package resource
 import (
 	"bytes"
 	"context"
+	"encoding/json"
+	"io"
 	"testing"
 
 	"github.com/concourse/concourse/atc"
@@ -155,6 +157,37 @@ func TestResourceGet(t *testing.T) {
 
 	})
 
+	t.Run("invalid JSON output", func(t *testing.T) {
+		container := runtimetest.NewContainer().
+			WithProcess(
+				expectedSpec,
+				runtimetest.ProcessStub{
+					Do: func(_ context.Context, process *runtimetest.Process) error {
+						_, err := io.WriteString(process.Stdout(), `{"version": }`)
+						return err
+					},
+				},
+			)
+
+		_, _, err := resource.Get(ctx, container, new(bytes.Buffer))
+		require.EqualError(t, err, `resource script (/opt/resource/in /tmp/build/get) output invalid JSON: invalid character '}' looking for beginning of value`)
+
+		var invalidJSONErr InvalidJSONError
+		require.ErrorAs(t, err, &invalidJSONErr)
+		require.Equal(t, expectedSpec, invalidJSONErr.Spec)
+
+		var syntaxErr *json.SyntaxError
+		require.ErrorAs(t, err, &syntaxErr)
+	})
+
+	t.Run("invalid cached JSON output", func(t *testing.T) {
+		container := runtimetest.NewContainer()
+		container.Props[resultCachePropertyName] = `{"version": }`
+
+		_, _, err := resource.Get(ctx, container, new(bytes.Buffer))
+		require.EqualError(t, err, `resource script (/opt/resource/in /tmp/build/get) output invalid JSON: invalid character '}' looking for beginning of value`)
+	})
+
 	t.Run("error", func(t *testing.T) {
 		container := runtimetest.NewContainer().
 			WithProcess(
@@ -281,6 +314,30 @@ func TestResourcePut(t *testing.T) {
 		require.Equal(t, expectedResult, result)
 		require.Equal(t, 0, processResult.ExitStatus)
 
+	})
+
+	t.Run("invalid JSON output", func(t *testing.T) {
+		container := runtimetest.NewContainer().
+			WithProcess(
+				expectedSpec,
+				runtimetest.ProcessStub{
+					Do: func(_ context.Context, process *runtimetest.Process) error {
+						_, err := io.WriteString(process.Stdout(), `{"version": }`)
+						return err
+					},
+				},
+			)
+
+		_, _, err := resource.Put(ctx, container, new(bytes.Buffer))
+		require.EqualError(t, err, `resource script (/opt/resource/out /tmp/build/put) output invalid JSON: invalid character '}' looking for beginning of value`)
+	})
+
+	t.Run("invalid cached JSON output", func(t *testing.T) {
+		container := runtimetest.NewContainer()
+		container.Props[resultCachePropertyName] = `{"version": }`
+
+		_, _, err := resource.Put(ctx, container, new(bytes.Buffer))
+		require.EqualError(t, err, `resource script (/opt/resource/out /tmp/build/put) output invalid JSON: invalid character '}' looking for beginning of value`)
 	})
 
 	t.Run("nil version", func(t *testing.T) {

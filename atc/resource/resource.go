@@ -21,6 +21,20 @@ type VersionResult struct {
 	Metadata atc.Metadata `json:"metadata,omitempty"`
 }
 
+type InvalidJSONError struct {
+	Spec runtime.ProcessSpec
+	Err  error
+}
+
+func (e InvalidJSONError) Error() string {
+	command := strings.Join(append([]string{e.Spec.Path}, e.Spec.Args...), " ")
+	return fmt.Sprintf("resource script (%s) output invalid JSON: %s", command, e.Err)
+}
+
+func (e InvalidJSONError) Unwrap() error {
+	return e.Err
+}
+
 type Resource struct {
 	Source  atc.Source  `json:"source"`
 	Params  atc.Params  `json:"params,omitempty"`
@@ -46,6 +60,11 @@ func (resource Resource) Check(ctx context.Context, container runtime.Container,
 
 func (resource Resource) Get(ctx context.Context, container runtime.Container, stderr io.Writer) (VersionResult, runtime.ProcessResult, error) {
 	var versionResult VersionResult
+	spec := runtime.ProcessSpec{
+		ID:   resourceProcessID,
+		Path: "/opt/resource/in",
+		Args: []string{ResourcesDir("get")},
+	}
 
 	properties, err := container.Properties()
 	if err != nil {
@@ -54,15 +73,9 @@ func (resource Resource) Get(ctx context.Context, container runtime.Container, s
 
 	if result := properties[resultCachePropertyName]; result != "" {
 		if err := json.Unmarshal([]byte(result), &versionResult); err != nil {
-			return VersionResult{}, runtime.ProcessResult{}, err
+			return VersionResult{}, runtime.ProcessResult{}, InvalidJSONError{Spec: spec, Err: err}
 		}
 		return versionResult, runtime.ProcessResult{}, nil
-	}
-
-	spec := runtime.ProcessSpec{
-		ID:   resourceProcessID,
-		Path: "/opt/resource/in",
-		Args: []string{ResourcesDir("get")},
 	}
 
 	processResult, err := resource.run(ctx, container, spec, stderr, true, &versionResult)
@@ -79,6 +92,11 @@ func (resource Resource) Get(ctx context.Context, container runtime.Container, s
 
 func (resource Resource) Put(ctx context.Context, container runtime.Container, stderr io.Writer) (VersionResult, runtime.ProcessResult, error) {
 	var versionResult VersionResult
+	spec := runtime.ProcessSpec{
+		ID:   resourceProcessID,
+		Path: "/opt/resource/out",
+		Args: []string{ResourcesDir("put")},
+	}
 
 	properties, err := container.Properties()
 	if err != nil {
@@ -87,15 +105,9 @@ func (resource Resource) Put(ctx context.Context, container runtime.Container, s
 
 	if result := properties[resultCachePropertyName]; result != "" {
 		if err := json.Unmarshal([]byte(result), &versionResult); err != nil {
-			return VersionResult{}, runtime.ProcessResult{}, err
+			return VersionResult{}, runtime.ProcessResult{}, InvalidJSONError{Spec: spec, Err: err}
 		}
 		return versionResult, runtime.ProcessResult{}, nil
-	}
-
-	spec := runtime.ProcessSpec{
-		ID:   resourceProcessID,
-		Path: "/opt/resource/out",
-		Args: []string{ResourcesDir("put")},
 	}
 
 	processResult, err := resource.run(ctx, container, spec, stderr, true, &versionResult)
@@ -154,7 +166,7 @@ func (resource Resource) run(ctx context.Context, container runtime.Container, s
 	}
 
 	if err := json.NewDecoder(buf).Decode(output); err != nil {
-		return runtime.ProcessResult{}, err
+		return runtime.ProcessResult{}, InvalidJSONError{Spec: spec, Err: err}
 	}
 	return result, nil
 }
