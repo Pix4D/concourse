@@ -3,7 +3,7 @@ package atc_test
 import (
 	"net/url"
 
-	"github.com/concourse/concourse/atc"
+	"github.com/concourse/concourse/v8/atc"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -124,6 +124,11 @@ var _ = Describe("PipelineRef", func() {
 				desc:  "empty",
 				query: url.Values{},
 				out:   nil,
+			},
+			{
+				desc:  "explicitly empty",
+				query: url.Values{"vars": []string{"{}"}},
+				out:   atc.InstanceVars{},
 			},
 			{
 				desc: "simple",

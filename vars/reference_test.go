@@ -1,7 +1,7 @@
 package vars_test
 
 import (
-	"github.com/concourse/concourse/vars"
+	"github.com/concourse/concourse/v8/vars"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -112,6 +112,21 @@ var _ = Describe("Reference", func() {
 				desc: "does not trim spaces in quoted segments",
 				raw:  `" hello "."world "`,
 				ref:  vars.Reference{Path: " hello ", Fields: []string{"world "}},
+			},
+			{
+				desc: "removes leading parent-dir path references when quoted",
+				raw:  `"../hello/world"`,
+				ref:  vars.Reference{Path: "hello/world", Fields: []string{}},
+			},
+			{
+				desc: "removes internal parent-dir path references when quoted",
+				raw:  `"hello/../world"`,
+				ref:  vars.Reference{Path: "world", Fields: []string{}},
+			},
+			{
+				desc: "removes internal parent-dir path references and preserves absolute path when quoted",
+				raw:  `"/hello/../world"`,
+				ref:  vars.Reference{Path: "/world", Fields: []string{}},
 			},
 		} {
 

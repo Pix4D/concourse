@@ -9,7 +9,8 @@ import (
 	"time"
 
 	"code.cloudfoundry.org/lager/v3/lagertest"
-	"github.com/concourse/concourse/atc/creds/vault"
+	"github.com/concourse/concourse/v8/atc/creds"
+	"github.com/concourse/concourse/v8/atc/creds/vault"
 	"github.com/hashicorp/vault/api"
 	"github.com/jessevdk/go-flags"
 	"github.com/square/certstrap/pkix"
@@ -265,6 +266,21 @@ var _ = Describe("VaultManager", func() {
 				Expect(configErr).To(HaveOccurred())
 				Expect(configErr.Error()).To(ContainSubstring("unknown_key"))
 			})
+		})
+	})
+
+	Describe("NewInstance()", func() {
+		var factory creds.ManagerFactory
+
+		BeforeEach(func() {
+			factory = vault.NewVaultManagerFactory()
+		})
+
+		It("error if url is not specified", func() {
+			config := map[string]any{}
+			manager, err := factory.NewInstance(config)
+			Expect(err).To(MatchError("vault url must be specified"))
+			Expect(manager).To(BeNil())
 		})
 	})
 })

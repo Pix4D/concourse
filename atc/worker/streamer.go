@@ -10,12 +10,12 @@ import (
 
 	"code.cloudfoundry.org/lager/v3"
 	"code.cloudfoundry.org/lager/v3/lagerctx"
-	"github.com/concourse/concourse/atc"
-	"github.com/concourse/concourse/atc/compression"
-	"github.com/concourse/concourse/atc/db"
-	"github.com/concourse/concourse/atc/metric"
-	"github.com/concourse/concourse/atc/runtime"
-	"github.com/concourse/concourse/tracing"
+	"github.com/concourse/concourse/v8/atc"
+	"github.com/concourse/concourse/v8/atc/compression"
+	"github.com/concourse/concourse/v8/atc/db"
+	"github.com/concourse/concourse/v8/atc/metric"
+	"github.com/concourse/concourse/v8/atc/runtime"
+	"github.com/concourse/concourse/v8/tracing"
 	"github.com/hashicorp/go-multierror"
 )
 
@@ -111,6 +111,12 @@ func (s Streamer) stream(ctx context.Context, src runtime.Artifact, dst runtime.
 		return s.streamThroughATC(ctx, src, dst)
 	}
 
+	srcGroup := p2pSrc.P2PStreamingGroup()
+	dstGroup := p2pDst.P2PStreamingGroup()
+	if srcGroup != dstGroup {
+		return s.streamThroughATC(ctx, src, dst)
+	}
+
 	err := s.p2pStream(ctx, p2pSrc, p2pDst)
 	if err != nil {
 		// P2P streaming failed - fallback to streaming through ATC (web node)
@@ -125,7 +131,7 @@ func (s Streamer) stream(ctx context.Context, src runtime.Artifact, dst runtime.
 	return nil
 }
 
-func (s Streamer) streamThroughATC(ctx context.Context, src runtime.Artifact, dst runtime.Volume) error {
+func (s Streamer) streamThroughATC(ctx context.Context, src runtime.Artifact, dst runtime.Volume) (err error) {
 	traceAttrs := tracing.Attrs{
 		"dest-worker": dst.DBVolume().WorkerName(),
 	}
@@ -133,6 +139,9 @@ func (s Streamer) streamThroughATC(ctx context.Context, src runtime.Artifact, ds
 		traceAttrs["origin-volume"] = srcVolume.Handle()
 		traceAttrs["origin-worker"] = srcVolume.DBVolume().WorkerName()
 	}
+	ctx, span := tracing.StartSpan(ctx, "volume.StreamThroughATC", traceAttrs)
+	defer func() { tracing.End(span, err) }()
+
 	out, err := src.StreamOut(ctx, ".", s.compression)
 
 	if err != nil {
@@ -144,7 +153,7 @@ func (s Streamer) streamThroughATC(ctx context.Context, src runtime.Artifact, ds
 	return dst.StreamIn(ctx, ".", s.compression, s.limitInMB, out)
 }
 
-func (s Streamer) p2pStream(ctx context.Context, src runtime.P2PVolume, dst runtime.P2PVolume) error {
+func (s Streamer) p2pStream(ctx context.Context, src runtime.P2PVolume, dst runtime.P2PVolume) (err error) {
 	getCtx, getCancel := context.WithTimeout(ctx, 5*time.Second)
 	defer getCancel()
 
@@ -166,13 +175,13 @@ func (s Streamer) p2pStream(ctx context.Context, src runtime.P2PVolume, dst runt
 	}
 	streamInUrl = rawUrl.String()
 
-	_, outSpan := tracing.StartSpan(ctx, "volume.P2pStreamOut", tracing.Attrs{
+	ctx, outSpan := tracing.StartSpan(ctx, "volume.P2pStreamOut", tracing.Attrs{
 		"origin-volume": src.Handle(),
 		"origin-worker": src.DBVolume().WorkerName(),
 		"dest-worker":   dst.DBVolume().WorkerName(),
 		"stream-in-url": streamInUrl,
 	})
-	defer outSpan.End()
+	defer func() { tracing.End(outSpan, err) }()
 
 	putCtx := ctx
 	if s.p2p.Timeout != 0 {
@@ -190,14 +199,21 @@ func (s Streamer) StreamFile(ctx context.Context, artifact runtime.Artifact, pat
 		return nil, err
 	}
 
+	// On errors, close the stream too: it holds the connection to the worker,
+	// and its trace span only ends when it is closed. Close it before the
+	// decompressor, whose Close can wait on a read that only closing the
+	// stream ends.
 	compressionReader, err := s.compression.NewReader(out)
 	if err != nil {
+		out.Close()
 		return nil, err
 	}
 	tarReader := tar.NewReader(compressionReader)
 
 	_, err = tarReader.Next()
 	if err != nil {
+		out.Close()
+		compressionReader.Close()
 		return nil, err
 	}
 

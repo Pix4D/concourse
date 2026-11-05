@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"os/exec"
 
-	"github.com/concourse/concourse/atc"
+	"github.com/concourse/concourse/v8/atc"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/gbytes"
@@ -45,6 +45,14 @@ var _ = Describe("Pause Job", func() {
 
 		It("successfully pauses the job", func() {
 			flyCmd = exec.Command(flyPath, "-t", targetName, "pause-job", "-j", fullJobName)
+			sess, err := gexec.Start(flyCmd, GinkgoWriter, GinkgoWriter)
+			Expect(err).NotTo(HaveOccurred())
+			Eventually(sess).Should(gexec.Exit(0))
+			Eventually(sess.Out.Contents).Should(ContainSubstring(fmt.Sprintf("paused '%s'\n", jobName)))
+		})
+
+		It("successfully pauses the job using --instance-var", func() {
+			flyCmd = exec.Command(flyPath, "-t", targetName, "pause-job", "-j", fmt.Sprintf("%s/%s", pipelineName, jobName), "-i", "branch=master")
 			sess, err := gexec.Start(flyCmd, GinkgoWriter, GinkgoWriter)
 			Expect(err).NotTo(HaveOccurred())
 			Eventually(sess).Should(gexec.Exit(0))
@@ -113,6 +121,16 @@ var _ = Describe("Pause Job", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Eventually(sess).Should(gexec.Exit(1))
 			Eventually(sess.Err.Contents).Should(ContainSubstring("doesnotexist-pipeline/doesnotexist-job not found on team main"))
+		})
+	})
+
+	Context("when instance vars are specified in both the job ref and --instance-var", func() {
+		It("errors without pausing the job", func() {
+			flyCmd = exec.Command(flyPath, "-t", targetName, "pause-job", "-j", fullJobName, "-i", "env=prod")
+			sess, err := gexec.Start(flyCmd, GinkgoWriter, GinkgoWriter)
+			Expect(err).NotTo(HaveOccurred())
+			Eventually(sess.Err).Should(gbytes.Say("instance vars specified both in pipeline name and via --instance-var"))
+			Eventually(sess).Should(gexec.Exit(1))
 		})
 	})
 

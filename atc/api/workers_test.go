@@ -8,10 +8,10 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/concourse/concourse/atc"
-	"github.com/concourse/concourse/atc/db"
-	"github.com/concourse/concourse/atc/db/dbfakes"
-	. "github.com/concourse/concourse/atc/testhelpers"
+	"github.com/concourse/concourse/v8/atc"
+	"github.com/concourse/concourse/v8/atc/db"
+	"github.com/concourse/concourse/v8/atc/db/dbfakes"
+	. "github.com/concourse/concourse/v8/atc/testhelpers"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -46,6 +46,7 @@ var _ = Describe("Workers API", func() {
 				teamWorker1.GardenAddrReturns(&gardenAddr1)
 				bcURL1 := "1.2.3.4:8888"
 				teamWorker1.BaggageclaimURLReturns(&bcURL1)
+				teamWorker1.P2PStreamingGroupReturns("group-a")
 
 				teamWorker2 = new(dbfakes.FakeWorker)
 				gardenAddr2 := "5.6.7.8:7777"
@@ -85,8 +86,9 @@ var _ = Describe("Workers API", func() {
 
 					Expect(returnedWorkers).To(Equal([]atc.Worker{
 						{
-							GardenAddr:      "1.2.3.4:7777",
-							BaggageclaimURL: "1.2.3.4:8888",
+							GardenAddr:        "1.2.3.4:7777",
+							BaggageclaimURL:   "1.2.3.4:8888",
+							P2PStreamingGroup: "group-a",
 						},
 						{
 							GardenAddr:      "5.6.7.8:7777",
@@ -124,8 +126,9 @@ var _ = Describe("Workers API", func() {
 
 					Expect(returnedWorkers).To(Equal([]atc.Worker{
 						{
-							GardenAddr:      "1.2.3.4:7777",
-							BaggageclaimURL: "1.2.3.4:8888",
+							GardenAddr:        "1.2.3.4:7777",
+							BaggageclaimURL:   "1.2.3.4:8888",
+							P2PStreamingGroup: "group-a",
 						},
 						{
 							GardenAddr:      "5.6.7.8:7777",

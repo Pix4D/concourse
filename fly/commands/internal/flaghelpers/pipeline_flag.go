@@ -6,9 +6,9 @@ import (
 
 	"github.com/jessevdk/go-flags"
 
-	"github.com/concourse/concourse/atc"
-	"github.com/concourse/concourse/fly/rc"
-	"github.com/concourse/concourse/go-concourse/concourse"
+	"github.com/concourse/concourse/v8/atc"
+	"github.com/concourse/concourse/v8/fly/rc"
+	"github.com/concourse/concourse/v8/go-concourse/concourse"
 )
 
 type PipelineFlag struct {
@@ -50,6 +50,10 @@ func (flag *PipelineFlag) UnmarshalFlag(value string) error {
 	vs := strings.SplitN(value, "/", 2)
 	if len(vs) == 2 {
 		flag.Name = vs[0]
+		if vs[1] == "" {
+			flag.InstanceVars = atc.InstanceVars{}
+			return nil
+		}
 		var err error
 		flag.InstanceVars, err = unmarshalInstanceVars(vs[1])
 		if err != nil {

@@ -4,9 +4,9 @@ import (
 	"os/exec"
 	"time"
 
-	"github.com/concourse/concourse/atc"
-	"github.com/concourse/concourse/fly/rc"
-	"github.com/concourse/concourse/fly/ui"
+	"github.com/concourse/concourse/v8/atc"
+	"github.com/concourse/concourse/v8/fly/rc"
+	"github.com/concourse/concourse/v8/fly/ui"
 	"github.com/fatih/color"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -30,9 +30,12 @@ var _ = Describe("fly health", func() {
 			Timestamp: time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC),
 			Database:  atc.DatabaseHealth{Status: atc.HealthStatusHealthy},
 			Workers: atc.WorkerHealth{
-				Status:  string(atc.HealthStatusHealthy),
-				Total:   2,
-				Running: 2,
+				Status:     string(atc.HealthStatusHealthy),
+				Total:      2,
+				Running:    2,
+				ByPlatform: map[string]atc.WorkerBreakdown{},
+				ByTeam:     map[string]atc.WorkerBreakdown{},
+				ByTag:      map[string]atc.WorkerBreakdown{},
 			},
 			Components: []atc.ComponentHealth{
 				{
@@ -112,7 +115,7 @@ var _ = Describe("fly health", func() {
 					"status": "ok",
 					"timestamp": "2024-01-01T12:00:00Z",
 					"database": {"status": "healthy"},
-					"workers": {"status": "healthy", "total": 2, "running": 2},
+					"workers": {"status": "healthy", "total": 2, "running": 2, "by_platform": {}, "by_team": {}, "by_tag": {}},
 					"components": [{"name": "scheduler", "status": "healthy", "paused": false, "last_ran": "2024-01-01T11:59:00Z"}]
 				}`))
 			})

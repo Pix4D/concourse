@@ -10,12 +10,15 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 
 	"code.cloudfoundry.org/lager/v3"
 	"code.cloudfoundry.org/lager/v3/lagerctx"
-	"github.com/concourse/concourse/tracing"
-	"github.com/concourse/concourse/worker/baggageclaim"
-	"github.com/concourse/concourse/worker/baggageclaim/uidgid"
+	"github.com/concourse/concourse/v8/tracing"
+	"github.com/concourse/concourse/v8/worker/baggageclaim"
+	"github.com/concourse/concourse/v8/worker/baggageclaim/uidgid"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/propagation"
 )
 
 var ErrVolumeDoesNotExist = errors.New("volume does not exist")
@@ -39,7 +42,9 @@ type Repository interface {
 	StreamIn(ctx context.Context, handle string, path string, encoding baggageclaim.Encoding, limitInMB float64, stream io.Reader) (bool, error)
 	StreamOut(ctx context.Context, handle string, path string, encoding baggageclaim.Encoding, dest io.Writer) error
 
-	StreamP2pOut(ctx context.Context, handle string, path string, encoding baggageclaim.Encoding, streamInURL string) error
+	// StreamP2pOut streams a volume path to another worker's stream-in URL and
+	// returns the number of compressed bytes it sent.
+	StreamP2pOut(ctx context.Context, handle string, path string, encoding baggageclaim.Encoding, streamInURL string) (int64, error)
 
 	VolumeParent(ctx context.Context, handle string) (Volume, bool, error)
 
@@ -61,6 +66,8 @@ type repository struct {
 	s2Streamer   Streamer
 	rawStreamer  Streamer
 	namespacer   func(bool) uidgid.Namespacer
+
+	namespacePrivilegedVolumes bool
 }
 
 func NewRepository(
@@ -68,10 +75,12 @@ func NewRepository(
 	locker LockManager,
 	privilegedNamespacer uidgid.Namespacer,
 	unprivilegedNamespacer uidgid.Namespacer,
+	namespacePrivilegedVolumes bool,
 ) Repository {
 	return &repository{
-		filesystem: filesystem,
-		locker:     locker,
+		filesystem:                 filesystem,
+		locker:                     locker,
+		namespacePrivilegedVolumes: namespacePrivilegedVolumes,
 
 		rawStreamer: &tarGzipStreamer{
 			namespacer: unprivilegedNamespacer,
@@ -174,12 +183,16 @@ func (repo *repository) CleanupOrphanedVolumes(ctx context.Context) error {
 	return repo.filesystem.CleanupOrphanedEntries()
 }
 
-func (repo *repository) CreateVolume(ctx context.Context, handle string, strategy Strategy, opts VolumeOpts) (Volume, error) {
+func (repo *repository) CreateVolume(ctx context.Context,
+	handle string,
+	strategy Strategy,
+	opts VolumeOpts,
+) (_ Volume, err error) {
 	ctx, span := tracing.StartSpan(ctx, "volumeRepository.CreateVolume", tracing.Attrs{
 		"volume":   handle,
 		"strategy": strategy.String(),
 	})
-	defer span.End()
+	defer func() { tracing.End(span, err) }()
 	logger := lagerctx.FromContext(ctx).Session("create-volume", lager.Data{"handle": handle})
 	logger.Debug("creating")
 	defer logger.Debug("created")
@@ -302,7 +315,11 @@ func (repo *repository) GetVolume(ctx context.Context, handle string) (Volume, b
 	return volume, true, nil
 }
 
-func (repo *repository) SetProperty(ctx context.Context, handle string, propertyName string, propertyValue string) error {
+func (repo *repository) SetProperty(ctx context.Context,
+	handle string,
+	propertyName string,
+	propertyValue string,
+) error {
 	repo.locker.Lock(handle)
 	defer repo.locker.Unlock(handle)
 
@@ -403,13 +420,19 @@ func (repo *repository) SetPrivileged(ctx context.Context, handle string, privil
 	return nil
 }
 
-func (repo *repository) StreamIn(ctx context.Context, handle string, path string, encoding baggageclaim.Encoding, limitInMB float64, stream io.Reader) (bool, error) {
+func (repo *repository) StreamIn(ctx context.Context,
+	handle string,
+	path string,
+	encoding baggageclaim.Encoding,
+	limitInMB float64,
+	stream io.Reader,
+) (_ bool, err error) {
 	ctx, span := tracing.StartSpan(ctx, "volumeRepository.StreamIn", tracing.Attrs{
 		"volume":   handle,
 		"sub-path": path,
 		"encoding": string(encoding),
 	})
-	defer span.End()
+	defer func() { tracing.End(span, err) }()
 
 	logger := lagerctx.FromContext(ctx).Session("stream-in", lager.Data{
 		"volume":   handle,
@@ -428,8 +451,12 @@ func (repo *repository) StreamIn(ctx context.Context, handle string, path string
 		return false, ErrVolumeDoesNotExist
 	}
 
-	path = strings.ReplaceAll(path, "..", "")
-	destinationPath := filepath.Join(volume.DataPath(), path)
+	destinationPath := filepath.Join(volume.DataPath(), filepath.Clean("/"+path))
+	if !strings.HasPrefix(destinationPath, volume.DataPath()) {
+		err = fmt.Errorf("path '%s' is outside the volume data path '%s'", destinationPath, volume.DataPath())
+		logger.Error("path-outside-volume", err)
+		return false, err
+	}
 
 	logger = logger.WithData(lager.Data{
 		"full-path": destinationPath,
@@ -467,6 +494,9 @@ func (repo *repository) StreamIn(ctx context.Context, handle string, path string
 	}
 
 	limitedReader := NewLimitedReader(int(limitInMB*1024*1024), stream)
+	// FUSE-only and ignore mode map even privileged volumes into a user
+	// namespace; tar must use that same mapping rather than host ownership.
+	privileged = privileged && !repo.namespacePrivilegedVolumes
 	var badStream bool
 	switch encoding {
 	case baggageclaim.ZstdEncoding:
@@ -490,12 +520,17 @@ func (repo *repository) StreamIn(ctx context.Context, handle string, path string
 	return badStream, nil
 }
 
-func (repo *repository) StreamOut(ctx context.Context, handle string, path string, encoding baggageclaim.Encoding, dest io.Writer) error {
+func (repo *repository) StreamOut(ctx context.Context,
+	handle string,
+	path string,
+	encoding baggageclaim.Encoding,
+	dest io.Writer,
+) (err error) {
 	ctx, span := tracing.StartSpan(ctx, "volumeRepository.StreamOut", tracing.Attrs{
 		"volume":   handle,
 		"sub-path": path,
 	})
-	defer span.End()
+	defer func() { tracing.End(span, err) }()
 
 	logger := lagerctx.FromContext(ctx).Session("stream-out", lager.Data{
 		"volume":   handle,
@@ -513,7 +548,12 @@ func (repo *repository) StreamOut(ctx context.Context, handle string, path strin
 		return ErrVolumeDoesNotExist
 	}
 
-	srcPath := filepath.Join(volume.DataPath(), path)
+	srcPath := filepath.Join(volume.DataPath(), filepath.Clean("/"+path))
+	if !strings.HasPrefix(srcPath, volume.DataPath()) {
+		err = fmt.Errorf("path '%s' is outside the volume data path '%s'", srcPath, volume.DataPath())
+		logger.Error("path-outside-volume", err)
+		return err
+	}
 
 	logger = logger.WithData(lager.Data{
 		"full-path": srcPath,
@@ -525,27 +565,39 @@ func (repo *repository) StreamOut(ctx context.Context, handle string, path strin
 		return err
 	}
 
+	isPrivileged = isPrivileged && !repo.namespacePrivilegedVolumes
+
+	// What the streamer writes to dest is what goes to the caller, so count it
+	// there.
+	sent := &countingWriter{Writer: dest}
+	defer func() { span.SetAttributes(attribute.Int64("streamed-bytes", sent.count.Load())) }()
+
 	switch encoding {
 	case baggageclaim.ZstdEncoding:
-		return repo.zstdStreamer.Out(dest, srcPath, isPrivileged)
+		return repo.zstdStreamer.Out(sent, srcPath, isPrivileged)
 	case baggageclaim.GzipEncoding:
-		return repo.gzipStreamer.Out(dest, srcPath, isPrivileged)
+		return repo.gzipStreamer.Out(sent, srcPath, isPrivileged)
 	case baggageclaim.S2Encoding:
-		return repo.s2Streamer.Out(dest, srcPath, isPrivileged)
+		return repo.s2Streamer.Out(sent, srcPath, isPrivileged)
 	case baggageclaim.RawEncoding:
-		return repo.rawStreamer.Out(dest, srcPath, isPrivileged)
+		return repo.rawStreamer.Out(sent, srcPath, isPrivileged)
 	}
 
 	return ErrUnsupportedStreamEncoding
 }
 
-func (repo *repository) StreamP2pOut(ctx context.Context, handle string, path string, encoding baggageclaim.Encoding, streamInURL string) error {
+func (repo *repository) StreamP2pOut(ctx context.Context,
+	handle string,
+	path string,
+	encoding baggageclaim.Encoding,
+	streamInURL string,
+) (_ int64, err error) {
 	ctx, span := tracing.StartSpan(ctx, "volumeRepository.StreamP2pOut", tracing.Attrs{
 		"volume":   handle,
 		"sub-path": path,
 		"encoding": string(encoding),
 	})
-	defer span.End()
+	defer func() { tracing.End(span, err) }()
 
 	logger := lagerctx.FromContext(ctx).Session("stream-p2p-out", lager.Data{
 		"volume":   handle,
@@ -559,15 +611,20 @@ func (repo *repository) StreamP2pOut(ctx context.Context, handle string, path st
 	volume, found, err := repo.filesystem.LookupVolume(handle)
 	if err != nil {
 		logger.Error("failed-to-lookup-volume", err)
-		return err
+		return 0, err
 	}
 
 	if !found {
 		logger.Info("volume-not-found")
-		return ErrVolumeDoesNotExist
+		return 0, ErrVolumeDoesNotExist
 	}
 
-	srcPath := filepath.Join(volume.DataPath(), path)
+	srcPath := filepath.Join(volume.DataPath(), filepath.Clean("/"+path))
+	if !strings.HasPrefix(srcPath, volume.DataPath()) {
+		err = fmt.Errorf("path '%s' is outside the volume data path '%s'", srcPath, volume.DataPath())
+		logger.Error("path-outside-volume", err)
+		return 0, err
+	}
 
 	logger = logger.WithData(lager.Data{
 		"full-path": srcPath,
@@ -576,10 +633,11 @@ func (repo *repository) StreamP2pOut(ctx context.Context, handle string, path st
 	isPrivileged, err := volume.LoadPrivileged()
 	if err != nil {
 		logger.Error("failed-to-check-if-volume-is-privileged", err)
-		return err
+		return 0, err
 	}
 
 	logger.Debug("p2p-streaming-start", lager.Data{"streamInURL": streamInURL})
+	isPrivileged = isPrivileged && !repo.namespacePrivilegedVolumes
 
 	reader, writer := io.Pipe()
 	go func() {
@@ -603,17 +661,23 @@ func (repo *repository) StreamP2pOut(ctx context.Context, handle string, path st
 		writer.Close()
 	}()
 
+	// What the HTTP transport reads from the pipe is what goes to the
+	// destination, so count it there.
+	sent := &countingReader{ReadCloser: reader}
+	defer func() { span.SetAttributes(attribute.Int64("streamed-bytes", sent.count.Load())) }()
+
 	client := &http.Client{}
-	req, err := http.NewRequest(http.MethodPut, streamInURL, reader)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, streamInURL, sent)
 	if err != nil {
 		logger.Error("failed-to-create-p2p-stream-in-request", err)
-		return err
+		return 0, err
 	}
 
 	req.Header.Set("Content-Encoding", string(encoding))
+	tracing.Inject(ctx, propagation.HeaderCarrier(req.Header))
 	resp, err := client.Do(req)
 	if err != nil {
-		return err
+		return sent.count.Load(), err
 	}
 
 	defer resp.Body.Close()
@@ -621,7 +685,7 @@ func (repo *repository) StreamP2pOut(ctx context.Context, handle string, path st
 	logger.Debug("p2p-streaming-end", lager.Data{"code": resp.StatusCode})
 
 	if resp.StatusCode == http.StatusNoContent {
-		return nil
+		return sent.count.Load(), nil
 	}
 
 	// Upon stream-in failure, decode error message from stream-in api.
@@ -633,7 +697,7 @@ func (repo *repository) StreamP2pOut(ctx context.Context, handle string, path st
 		errorResponse.Message = err.Error()
 	}
 
-	return fmt.Errorf("p2p-stream-in %d: %s", resp.StatusCode, errorResponse.Message)
+	return sent.count.Load(), fmt.Errorf("p2p-stream-in %d: %s", resp.StatusCode, errorResponse.Message)
 }
 
 func (repo *repository) VolumeParent(ctx context.Context, handle string) (Volume, bool, error) {
@@ -738,4 +802,35 @@ func NewLimitedReader(limit int, reader io.Reader) *LimitedReader {
 		read:       0,
 		underlying: reader,
 	}
+}
+
+// countingReader counts the bytes read through it, so that a span can record
+// how much data a stream carried. The count is atomic because the HTTP
+// transport reads a request body on its own goroutine, and Close is passed
+// through so the transport can still close the pipe and stop the compression
+// when the request fails.
+type countingReader struct {
+	io.ReadCloser
+	count atomic.Int64
+}
+
+func (r *countingReader) Read(p []byte) (int, error) {
+	n, err := r.ReadCloser.Read(p)
+	r.count.Add(int64(n))
+	return n, err
+}
+
+// countingWriter counts the bytes written through it, so that a span can
+// record how much data a stream carried. The count is atomic because the
+// streamers write on other goroutines than the one that reads it: exec copies
+// tar's output on one, and the zstd and s2 compressors write from their own.
+type countingWriter struct {
+	io.Writer
+	count atomic.Int64
+}
+
+func (w *countingWriter) Write(p []byte) (int, error) {
+	n, err := w.Writer.Write(p)
+	w.count.Add(int64(n))
+	return n, err
 }
