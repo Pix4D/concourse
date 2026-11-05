@@ -10,18 +10,18 @@ import (
 	"time"
 
 	"code.cloudfoundry.org/lager/v3/lagertest"
-	"github.com/concourse/concourse/atc"
-	"github.com/concourse/concourse/atc/db"
-	"github.com/concourse/concourse/atc/db/dbfakes"
-	"github.com/concourse/concourse/atc/db/lock/lockfakes"
-	"github.com/concourse/concourse/atc/exec"
-	"github.com/concourse/concourse/atc/exec/execfakes"
-	"github.com/concourse/concourse/atc/resource"
-	"github.com/concourse/concourse/atc/runtime"
-	"github.com/concourse/concourse/atc/runtime/runtimetest"
-	"github.com/concourse/concourse/atc/worker"
-	"github.com/concourse/concourse/tracing"
-	"github.com/concourse/concourse/vars"
+	"github.com/concourse/concourse/v8/atc"
+	"github.com/concourse/concourse/v8/atc/db"
+	"github.com/concourse/concourse/v8/atc/db/dbfakes"
+	"github.com/concourse/concourse/v8/atc/db/lock/lockfakes"
+	"github.com/concourse/concourse/v8/atc/exec"
+	"github.com/concourse/concourse/v8/atc/exec/execfakes"
+	"github.com/concourse/concourse/v8/atc/resource"
+	"github.com/concourse/concourse/v8/atc/runtime"
+	"github.com/concourse/concourse/v8/atc/runtime/runtimetest"
+	"github.com/concourse/concourse/v8/atc/worker"
+	"github.com/concourse/concourse/v8/tracing"
+	"github.com/concourse/concourse/v8/vars"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 	"go.opentelemetry.io/otel/trace"
@@ -379,6 +379,21 @@ var _ = Describe("CheckStep", func() {
 						Expect(actualGetImagePlan).To(Equal(*checkPlan.TypeImage.GetPlan))
 						Expect(actualCheckImagePlan).To(Equal(checkPlan.TypeImage.CheckPlan))
 						Expect(privileged).To(BeFalse())
+					})
+
+					Context("when fetching the image fails", func() {
+						var fetchErr error
+
+						BeforeEach(func() {
+							fetchErr = errors.New("Version is missing from previous step")
+							fakeDelegate.FetchImageReturns(runtime.ImageSpec{}, nil, fetchErr)
+						})
+
+						It("returns the error with resource type image context", func() {
+							Expect(stepOk).To(BeFalse())
+							Expect(stepErr).To(MatchError("failed to fetch image. Check the logs for more details (gear icon) or the resource_type config for this resource: Version is missing from previous step"))
+							Expect(errors.Is(stepErr, fetchErr)).To(BeTrue())
+						})
 					})
 
 					It("sets the image spec in the container spec", func() {

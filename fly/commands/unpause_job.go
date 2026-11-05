@@ -3,19 +3,24 @@ package commands
 import (
 	"fmt"
 
-	"github.com/concourse/concourse/fly/commands/internal/flaghelpers"
-	"github.com/concourse/concourse/fly/rc"
-	"github.com/concourse/concourse/go-concourse/concourse"
+	"github.com/concourse/concourse/v8/fly/commands/internal/flaghelpers"
+	"github.com/concourse/concourse/v8/fly/rc"
+	"github.com/concourse/concourse/v8/go-concourse/concourse"
 )
 
 type UnpauseJobCommand struct {
-	Job  flaghelpers.JobFlag  `short:"j" long:"job" required:"true" value-name:"PIPELINE/JOB" description:"Name of a job to unpause"`
-	Team flaghelpers.TeamFlag `long:"team" description:"Name of the team to which the job belongs, if different from the target default"`
+	Job          flaghelpers.JobFlag                `short:"j" long:"job" required:"true" value-name:"PIPELINE/JOB" description:"Name of a job to unpause"`
+	InstanceVars []flaghelpers.YAMLVariablePairFlag `short:"i" long:"instance-var" unquote:"false" value-name:"[NAME=YAML]" description:"Specify a YAML value for an instance variable (can be specified multiple times)"`
+	Team         flaghelpers.TeamFlag               `long:"team" description:"Name of the team to which the job belongs, if different from the target default"`
 }
 
 func (command *UnpauseJobCommand) Execute(args []string) error {
 	jobName := command.Job.JobName
 	pipelineRef := command.Job.PipelineRef
+	if err := flaghelpers.ApplyInstanceVars(&pipelineRef, command.InstanceVars); err != nil {
+		return err
+	}
+
 	target, err := rc.LoadTarget(Fly.Target, Fly.Verbose)
 	if err != nil {
 		return err

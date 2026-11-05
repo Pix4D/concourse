@@ -8,7 +8,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/concourse/concourse/atc"
+	"github.com/concourse/concourse/v8/atc"
 	"github.com/onsi/gomega/gbytes"
 	"github.com/onsi/gomega/gexec"
 	"github.com/onsi/gomega/ghttp"
@@ -59,6 +59,27 @@ var _ = Describe("trigger-job", func() {
 
 						Eventually(sess).Should(gbytes.Say(`started awesome-pipeline/branch:master/awesome-job #42`))
 
+						Eventually(sess).Should(gexec.Exit(0))
+					})
+				})
+
+				Context("instance vars are specified with --instance-var", func() {
+					BeforeEach(func() {
+						atcServer.AppendHandlers(
+							ghttp.CombineHandlers(
+								ghttp.VerifyRequest("POST", mainPath, queryParams),
+								ghttp.RespondWithJSONEncoded(http.StatusOK, atc.Build{ID: 57, Name: "42"}),
+							),
+						)
+					})
+
+					It("starts the build for the specified pipeline instance", func() {
+						flyCmd := exec.Command(flyPath, "-t", targetName, "trigger-job", "-j", "awesome-pipeline/awesome-job", "-i", "branch=master")
+
+						sess, err := gexec.Start(flyCmd, GinkgoWriter, GinkgoWriter)
+						Expect(err).NotTo(HaveOccurred())
+
+						Eventually(sess).Should(gbytes.Say(`started awesome-pipeline/branch:master/awesome-job #42`))
 						Eventually(sess).Should(gexec.Exit(0))
 					})
 				})
@@ -160,6 +181,18 @@ var _ = Describe("trigger-job", func() {
 			sess, err := gexec.Start(flyCmd, GinkgoWriter, GinkgoWriter)
 			Expect(err).NotTo(HaveOccurred())
 
+			Eventually(sess).Should(gexec.Exit(1))
+		})
+	})
+
+	Context("when instance vars are specified in both the job ref and --instance-var", func() {
+		It("errors without triggering a build", func() {
+			flyCmd := exec.Command(flyPath, "-t", targetName, "trigger-job", "-j", "awesome-pipeline/branch:master/awesome-job", "-i", "env=prod")
+
+			sess, err := gexec.Start(flyCmd, GinkgoWriter, GinkgoWriter)
+			Expect(err).NotTo(HaveOccurred())
+
+			Eventually(sess.Err).Should(gbytes.Say("instance vars specified both in pipeline name and via --instance-var"))
 			Eventually(sess).Should(gexec.Exit(1))
 		})
 	})

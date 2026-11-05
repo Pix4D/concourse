@@ -8,17 +8,17 @@ import (
 	"strings"
 	"time"
 
-	"github.com/concourse/concourse/atc"
-	"github.com/concourse/concourse/atc/db"
-	"github.com/concourse/concourse/atc/exec"
-	"github.com/concourse/concourse/atc/exec/build"
-	"github.com/concourse/concourse/atc/exec/execfakes"
-	"github.com/concourse/concourse/atc/runtime"
-	"github.com/concourse/concourse/atc/runtime/runtimetest"
-	"github.com/concourse/concourse/atc/worker"
-	"github.com/concourse/concourse/tracing"
-	"github.com/concourse/concourse/vars"
-	"github.com/concourse/concourse/worker/baggageclaim"
+	"github.com/concourse/concourse/v8/atc"
+	"github.com/concourse/concourse/v8/atc/db"
+	"github.com/concourse/concourse/v8/atc/exec"
+	"github.com/concourse/concourse/v8/atc/exec/build"
+	"github.com/concourse/concourse/v8/atc/exec/execfakes"
+	"github.com/concourse/concourse/v8/atc/runtime"
+	"github.com/concourse/concourse/v8/atc/runtime/runtimetest"
+	"github.com/concourse/concourse/v8/atc/worker"
+	"github.com/concourse/concourse/v8/tracing"
+	"github.com/concourse/concourse/v8/vars"
+	"github.com/concourse/concourse/v8/worker/baggageclaim"
 	"github.com/onsi/gomega/gbytes"
 	"go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
@@ -1084,6 +1084,21 @@ var _ = Describe("TaskStep", func() {
 				Expect(chosenContainer.Spec.ImageSpec).To(Equal(fetchedImageSpec))
 			})
 
+			Context("when fetching the image fails", func() {
+				var fetchErr error
+
+				BeforeEach(func() {
+					fetchErr = errors.New("image fetch failed")
+					fakeDelegate.FetchImageReturns(runtime.ImageSpec{}, fetchErr)
+				})
+
+				It("adds context and preserves the fetch error", func() {
+					Expect(stepOk).To(BeFalse())
+					Expect(stepErr).To(MatchError("failed to fetch image. Check the logs for more details (gear icon) or the task's image_resource config: image fetch failed"))
+					Expect(errors.Is(stepErr, fetchErr)).To(BeTrue())
+				})
+			})
+
 			Context("when privileged", func() {
 				BeforeEach(func() {
 					taskPlan.Privileged = true
@@ -1183,6 +1198,36 @@ var _ = Describe("TaskStep", func() {
 			It("doesn't register a artifact", func() {
 				Expect(repo.AsMap()).To(BeEmpty())
 			})
+		})
+	})
+
+	Context("when the plan has a config path whose container_limits use vars", func() {
+		BeforeEach(func() {
+			state = exec.NewRunState(noopStepper, vars.StaticVariables{
+				"cpu-limit": 512,
+				"mem-limit": "5gb",
+			})
+			repo = state.ArtifactRepository()
+			repo.RegisterArtifact("some-artifact", runtimetest.NewVolume("some-volume"), false)
+
+			fakeStreamer.StreamFileReturns(gbytes.BufferWithBytes([]byte(`
+platform: some-platform
+
+container_limits:
+  cpu: ((cpu-limit))
+  memory: ((mem-limit))
+
+run: {path: ls}
+`)), nil)
+
+			taskPlan.ConfigPath = "some-artifact/task.yml"
+
+			fakePool = new(execfakes.FakePool)
+			fakePool.FindOrSelectWorkerReturns(nil, errors.New("no worker for you"))
+		})
+
+		It("interpolates the file before it is parsed, so the step gets as far as picking a worker", func() {
+			Expect(stepErr).To(MatchError(ContainSubstring("no worker for you")))
 		})
 	})
 })

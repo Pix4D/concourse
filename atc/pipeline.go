@@ -7,7 +7,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/concourse/concourse/vars"
+	"github.com/concourse/concourse/v8/vars"
 	"sigs.k8s.io/yaml"
 )
 
@@ -37,7 +37,8 @@ func (p Pipeline) Ref() PipelineRef {
 }
 
 type RenameRequest struct {
-	NewName string `json:"name"`
+	NewName         string       `json:"name"`
+	NewInstanceVars InstanceVars `json:"instance_vars,omitempty"`
 }
 
 type InstanceVars map[string]any

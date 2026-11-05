@@ -3,18 +3,19 @@ package exec
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"time"
 
 	"code.cloudfoundry.org/lager/v3"
 	"code.cloudfoundry.org/lager/v3/lagerctx"
-	"github.com/concourse/concourse/atc"
-	"github.com/concourse/concourse/atc/creds"
-	"github.com/concourse/concourse/atc/db"
-	"github.com/concourse/concourse/atc/resource"
-	"github.com/concourse/concourse/atc/runtime"
-	"github.com/concourse/concourse/atc/worker"
-	"github.com/concourse/concourse/tracing"
+	"github.com/concourse/concourse/v8/atc"
+	"github.com/concourse/concourse/v8/atc/creds"
+	"github.com/concourse/concourse/v8/atc/db"
+	"github.com/concourse/concourse/v8/atc/resource"
+	"github.com/concourse/concourse/v8/atc/runtime"
+	"github.com/concourse/concourse/v8/atc/worker"
+	"github.com/concourse/concourse/v8/tracing"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -156,7 +157,7 @@ func (step *PutStep) run(ctx context.Context, state RunState, delegate PutDelega
 	if step.plan.TypeImage.GetPlan != nil {
 		imageSpec, imageResourceCache, err = delegate.FetchImage(ctx, *step.plan.TypeImage.GetPlan, step.plan.TypeImage.CheckPlan, step.plan.TypeImage.Privileged)
 		if err != nil {
-			return false, err
+			return false, fmt.Errorf("failed to fetch image. Check the logs for more details (gear icon) or the resource_type config for this resource: %w", err)
 		}
 	} else {
 		imageSpec.ResourceType = step.plan.TypeImage.BaseType

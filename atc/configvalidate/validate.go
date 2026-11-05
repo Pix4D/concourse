@@ -7,8 +7,8 @@ import (
 	"path"
 	"strings"
 
-	"github.com/concourse/concourse/atc"
-	"github.com/concourse/concourse/atc/creds"
+	"github.com/concourse/concourse/v8/atc"
+	"github.com/concourse/concourse/v8/atc/creds"
 	"github.com/gobwas/glob"
 )
 
@@ -447,7 +447,7 @@ func validateVarSources(c atc.Config) ([]atc.ConfigWarning, error) {
 			// TODO: this check should eventually be removed once all credential managers
 			// are supported in pipeline. - @evanchaoli
 			switch varSource.Type {
-			case "vault", "dummy", "ssm", "secretsmanager", "idtoken":
+			case "vault", "dummy", "ssm", "secretsmanager", "gcpsecretmanager", "idtoken":
 			default:
 				errorMessages = append(errorMessages, fmt.Sprintf("credential manager type %s is not supported in pipeline yet", varSource.Type))
 			}
