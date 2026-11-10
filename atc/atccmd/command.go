@@ -21,47 +21,48 @@ import (
 	"code.cloudfoundry.org/clock"
 	"code.cloudfoundry.org/lager/v3"
 	"code.cloudfoundry.org/lager/v3/lagerctx"
-	"github.com/concourse/concourse"
-	"github.com/concourse/concourse/atc"
-	"github.com/concourse/concourse/atc/api"
-	"github.com/concourse/concourse/atc/api/accessor"
-	"github.com/concourse/concourse/atc/api/auth"
-	"github.com/concourse/concourse/atc/api/buildserver"
-	"github.com/concourse/concourse/atc/api/containerserver"
-	"github.com/concourse/concourse/atc/api/pipelineserver"
-	"github.com/concourse/concourse/atc/api/policychecker"
-	"github.com/concourse/concourse/atc/auditor"
-	"github.com/concourse/concourse/atc/builds"
-	"github.com/concourse/concourse/atc/component"
-	"github.com/concourse/concourse/atc/compression"
-	"github.com/concourse/concourse/atc/creds"
-	"github.com/concourse/concourse/atc/creds/noop"
-	"github.com/concourse/concourse/atc/db"
-	"github.com/concourse/concourse/atc/db/encryption"
-	"github.com/concourse/concourse/atc/db/lock"
-	"github.com/concourse/concourse/atc/db/migration"
-	"github.com/concourse/concourse/atc/engine"
-	"github.com/concourse/concourse/atc/gc"
-	"github.com/concourse/concourse/atc/lidar"
-	"github.com/concourse/concourse/atc/metric"
-	"github.com/concourse/concourse/atc/pauser"
-	"github.com/concourse/concourse/atc/policy"
-	"github.com/concourse/concourse/atc/scheduler"
-	"github.com/concourse/concourse/atc/scheduler/algorithm"
-	"github.com/concourse/concourse/atc/syslog"
-	atctls "github.com/concourse/concourse/atc/tls"
-	"github.com/concourse/concourse/atc/util"
-	"github.com/concourse/concourse/atc/worker"
-	"github.com/concourse/concourse/atc/wrappa"
-	"github.com/concourse/concourse/flag"
-	"github.com/concourse/concourse/skymarshal/dexserver"
-	"github.com/concourse/concourse/skymarshal/legacyserver"
-	"github.com/concourse/concourse/skymarshal/skycmd"
-	"github.com/concourse/concourse/skymarshal/skyserver"
-	"github.com/concourse/concourse/skymarshal/storage"
-	"github.com/concourse/concourse/skymarshal/token"
-	"github.com/concourse/concourse/tracing"
-	"github.com/concourse/concourse/web"
+	"github.com/concourse/concourse/v8"
+	"github.com/concourse/concourse/v8/atc"
+	"github.com/concourse/concourse/v8/atc/api"
+	"github.com/concourse/concourse/v8/atc/api/accessor"
+	"github.com/concourse/concourse/v8/atc/api/auth"
+	"github.com/concourse/concourse/v8/atc/api/buildserver"
+	"github.com/concourse/concourse/v8/atc/api/containerserver"
+	"github.com/concourse/concourse/v8/atc/api/healthserver"
+	"github.com/concourse/concourse/v8/atc/api/pipelineserver"
+	"github.com/concourse/concourse/v8/atc/api/policychecker"
+	"github.com/concourse/concourse/v8/atc/auditor"
+	"github.com/concourse/concourse/v8/atc/builds"
+	"github.com/concourse/concourse/v8/atc/component"
+	"github.com/concourse/concourse/v8/atc/compression"
+	"github.com/concourse/concourse/v8/atc/creds"
+	"github.com/concourse/concourse/v8/atc/creds/noop"
+	"github.com/concourse/concourse/v8/atc/db"
+	"github.com/concourse/concourse/v8/atc/db/encryption"
+	"github.com/concourse/concourse/v8/atc/db/lock"
+	"github.com/concourse/concourse/v8/atc/db/migration"
+	"github.com/concourse/concourse/v8/atc/engine"
+	"github.com/concourse/concourse/v8/atc/gc"
+	"github.com/concourse/concourse/v8/atc/lidar"
+	"github.com/concourse/concourse/v8/atc/metric"
+	"github.com/concourse/concourse/v8/atc/pauser"
+	"github.com/concourse/concourse/v8/atc/policy"
+	"github.com/concourse/concourse/v8/atc/scheduler"
+	"github.com/concourse/concourse/v8/atc/scheduler/algorithm"
+	"github.com/concourse/concourse/v8/atc/syslog"
+	atctls "github.com/concourse/concourse/v8/atc/tls"
+	"github.com/concourse/concourse/v8/atc/util"
+	"github.com/concourse/concourse/v8/atc/worker"
+	"github.com/concourse/concourse/v8/atc/wrappa"
+	"github.com/concourse/concourse/v8/flag"
+	"github.com/concourse/concourse/v8/skymarshal/dexserver"
+	"github.com/concourse/concourse/v8/skymarshal/legacyserver"
+	"github.com/concourse/concourse/v8/skymarshal/skycmd"
+	"github.com/concourse/concourse/v8/skymarshal/skyserver"
+	"github.com/concourse/concourse/v8/skymarshal/storage"
+	"github.com/concourse/concourse/v8/skymarshal/token"
+	"github.com/concourse/concourse/v8/tracing"
+	"github.com/concourse/concourse/v8/web"
 	"github.com/cppforlife/go-semi-semantic/version"
 	"github.com/go-jose/go-jose/v4/jwt"
 	"github.com/hashicorp/go-multierror"
@@ -78,20 +79,21 @@ import (
 	"golang.org/x/time/rate"
 
 	// dynamically registered metric emitters
-	_ "github.com/concourse/concourse/atc/metric/emitter"
+	_ "github.com/concourse/concourse/v8/atc/metric/emitter"
 
 	// dynamically registered policy checkers
-	_ "github.com/concourse/concourse/atc/policy/opa"
+	_ "github.com/concourse/concourse/v8/atc/policy/opa"
 
 	// dynamically registered credential managers
-	_ "github.com/concourse/concourse/atc/creds/conjur"
-	_ "github.com/concourse/concourse/atc/creds/credhub"
-	_ "github.com/concourse/concourse/atc/creds/dummy"
-	"github.com/concourse/concourse/atc/creds/idtoken"
-	_ "github.com/concourse/concourse/atc/creds/kubernetes"
-	_ "github.com/concourse/concourse/atc/creds/secretsmanager"
-	_ "github.com/concourse/concourse/atc/creds/ssm"
-	_ "github.com/concourse/concourse/atc/creds/vault"
+	_ "github.com/concourse/concourse/v8/atc/creds/conjur"
+	_ "github.com/concourse/concourse/v8/atc/creds/credhub"
+	_ "github.com/concourse/concourse/v8/atc/creds/dummy"
+	_ "github.com/concourse/concourse/v8/atc/creds/gcpsecretmanager"
+	"github.com/concourse/concourse/v8/atc/creds/idtoken"
+	_ "github.com/concourse/concourse/v8/atc/creds/kubernetes"
+	_ "github.com/concourse/concourse/v8/atc/creds/secretsmanager"
+	_ "github.com/concourse/concourse/v8/atc/creds/ssm"
+	_ "github.com/concourse/concourse/v8/atc/creds/vault"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
@@ -207,8 +209,9 @@ type RunCommand struct {
 	} `group:"Web Server"`
 
 	Health struct {
-		MinWorkerCount           int     `long:"health-min-worker-count" default:"1" description:"Minimum number of running workers before the health endpoint reports degraded. Setting this to 0 means the endpoint will only report healthy or failing — never degraded."`
-		ComponentStaleMultiplier float64 `long:"health-component-stale-multiplier" default:"2.0" description:"A component is considered stale when it has not run for more than this multiplier times its interval. Stale runtime components (scheduler, tracker, scanner) cause degraded status."`
+		MinWorkerCount           int      `long:"health-min-worker-count" default:"1" description:"Minimum number of running workers before the health endpoint reports degraded. Setting this to 0 means the endpoint will only report healthy or failing — never degraded."`
+		MinWorkerScopes          []string `long:"health-min-worker-scopes" description:"Minimum running-worker threshold for a platform, team, or tag. Format: kind:name:count:severity (all four fields required). Kind: platform (linux/windows/darwin), team, tag; empty team name (team::count:severity) targets unscoped workers. Severity (critical/warn/info): critical — running==0 reports failing (HTTP 503), 0<running<min reports degraded; warn — any shortfall reports degraded, never failing; info — tracked in breakdown only, no status impact."`
+		ComponentStaleMultiplier float64  `long:"health-component-stale-multiplier" default:"2.0" description:"A component is considered stale when it has not run for more than this multiplier times its interval. Stale runtime components (scheduler, tracker, scanner) cause degraded status."`
 	} `group:"Health Endpoint"`
 
 	LogDBQueries   bool `long:"log-db-queries" description:"Log database queries."`
@@ -278,7 +281,7 @@ type RunCommand struct {
 		EnableBuildRerunWhenWorkerDisappears bool `long:"enable-rerun-when-worker-disappears" description:"Enable automatically build rerun when worker disappears or a network error occurs"`
 		EnableAcrossStep                     bool `long:"enable-across-step" description:"DEPRECATED: The across step is always enabled and this config has no effect."`
 		EnablePipelineInstances              bool `long:"enable-pipeline-instances" description:"DEPRECATED: Pipeline instances are always enabled and this config has no effect."`
-		EnableP2PVolumeStreaming             bool `long:"enable-p2p-volume-streaming" description:"Enable P2P volume streaming. NOTE: All workers must be on the same LAN network"`
+		EnableP2PVolumeStreaming             bool `long:"enable-p2p-volume-streaming" description:"Enable P2P volume streaming between workers within the same P2P streaming group. NOTE: All workers in a P2P group must be on the same LAN network."`
 		EnableCacheStreamedVolumes           bool `long:"enable-cache-streamed-volumes" description:"When enabled, streamed resource volumes will be cached on the destination worker."`
 		EnableResourceCausality              bool `long:"enable-resource-causality" description:"Enable the resource causality page. Computing causality can be expensive for the database. "`
 	} `group:"Feature Flags"`
@@ -1791,6 +1794,8 @@ func (cmd *RunCommand) constructDBConn(
 	// Prepare
 	dbConn.SetMaxOpenConns(maxConns)
 	dbConn.SetMaxIdleConns(idleConns)
+	dbConn.SetConnMaxLifetime(5 * time.Minute)
+	dbConn.SetConnMaxIdleTime(1 * time.Minute)
 
 	return dbConn, nil
 }
@@ -2101,6 +2106,11 @@ func (cmd *RunCommand) constructAPIHandler(
 		return nil, err
 	}
 
+	minWorkerThresholds, err := healthserver.ParseMinWorkerThresholds(cmd.Health.MinWorkerScopes)
+	if err != nil {
+		return nil, err
+	}
+
 	apiWrapper := wrappa.MultiWrappa{
 		wrappa.NewConcurrentRequestLimitsWrappa(
 			logger,
@@ -2148,6 +2158,7 @@ func (cmd *RunCommand) constructAPIHandler(
 		dbComponentFactory,
 		dbConn,
 		cmd.Health.MinWorkerCount,
+		minWorkerThresholds,
 		cmd.Health.ComponentStaleMultiplier,
 
 		buildserver.NewEventHandler,

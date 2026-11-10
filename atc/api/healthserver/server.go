@@ -2,16 +2,16 @@ package healthserver
 
 import (
 	"code.cloudfoundry.org/lager/v3"
-	"github.com/concourse/concourse/atc/db"
+	"github.com/concourse/concourse/v8/atc/db"
 )
 
-// Server holds the dependencies needed to serve the health endpoint.
 type Server struct {
 	logger                   lager.Logger
 	dbConn                   db.DbConn
 	workerFactory            db.WorkerFactory
 	componentFactory         db.ComponentFactory
 	minWorkerCount           int
+	minWorkerThresholds      MinWorkerThresholds
 	componentStaleMultiplier float64
 }
 
@@ -21,6 +21,7 @@ func NewServer(
 	workerFactory db.WorkerFactory,
 	componentFactory db.ComponentFactory,
 	minWorkerCount int,
+	minWorkerThresholds MinWorkerThresholds,
 	componentStaleMultiplier float64,
 ) *Server {
 	return &Server{
@@ -29,6 +30,7 @@ func NewServer(
 		workerFactory:            workerFactory,
 		componentFactory:         componentFactory,
 		minWorkerCount:           minWorkerCount,
+		minWorkerThresholds:      minWorkerThresholds,
 		componentStaleMultiplier: componentStaleMultiplier,
 	}
 }

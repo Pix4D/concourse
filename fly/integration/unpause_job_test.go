@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"os/exec"
 
-	"github.com/concourse/concourse/atc"
+	"github.com/concourse/concourse/v8/atc"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/gbytes"
@@ -51,6 +51,14 @@ var _ = Describe("unpause-job", func() {
 					sess, err := gexec.Start(flyCmd, GinkgoWriter, GinkgoWriter)
 					Expect(err).NotTo(HaveOccurred())
 
+					Eventually(sess).Should(gexec.Exit(0))
+					Eventually(sess).Should(gbytes.Say(fmt.Sprintf("unpaused '%s'\n", jobName)))
+				})
+
+				It("successfully unpauses the job using --instance-var", func() {
+					flyCmd = exec.Command(flyPath, "-t", targetName, "unpause-job", "-j", fmt.Sprintf("%s/%s", pipelineName, jobName), "-i", "branch=master")
+					sess, err := gexec.Start(flyCmd, GinkgoWriter, GinkgoWriter)
+					Expect(err).NotTo(HaveOccurred())
 					Eventually(sess).Should(gexec.Exit(0))
 					Eventually(sess).Should(gbytes.Say(fmt.Sprintf("unpaused '%s'\n", jobName)))
 				})
@@ -103,6 +111,16 @@ var _ = Describe("unpause-job", func() {
 
 				Eventually(sess).Should(gexec.Exit(1))
 			})
+		})
+	})
+
+	Context("when instance vars are specified in both the job ref and --instance-var", func() {
+		It("errors without unpausing the job", func() {
+			flyCmd = exec.Command(flyPath, "-t", targetName, "unpause-job", "-j", fullJobName, "-i", "env=prod")
+			sess, err := gexec.Start(flyCmd, GinkgoWriter, GinkgoWriter)
+			Expect(err).NotTo(HaveOccurred())
+			Eventually(sess.Err).Should(gbytes.Say("instance vars specified both in pipeline name and via --instance-var"))
+			Eventually(sess).Should(gexec.Exit(1))
 		})
 	})
 

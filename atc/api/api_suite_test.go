@@ -12,21 +12,22 @@ import (
 	"code.cloudfoundry.org/lager/v3"
 	"code.cloudfoundry.org/lager/v3/lagertest"
 
-	"github.com/concourse/concourse/atc/api"
-	"github.com/concourse/concourse/atc/api/accessor"
-	"github.com/concourse/concourse/atc/api/accessor/accessorfakes"
-	"github.com/concourse/concourse/atc/api/apifakes"
-	"github.com/concourse/concourse/atc/api/auth"
-	"github.com/concourse/concourse/atc/api/containerserver/containerserverfakes"
-	"github.com/concourse/concourse/atc/api/policychecker/policycheckerfakes"
-	"github.com/concourse/concourse/atc/auditor/auditorfakes"
-	"github.com/concourse/concourse/atc/creds"
-	"github.com/concourse/concourse/atc/creds/credsfakes"
-	"github.com/concourse/concourse/atc/db"
-	"github.com/concourse/concourse/atc/db/dbfakes"
-	"github.com/concourse/concourse/atc/gc/gcfakes"
-	"github.com/concourse/concourse/atc/policy"
-	"github.com/concourse/concourse/atc/wrappa"
+	"github.com/concourse/concourse/v8/atc/api"
+	"github.com/concourse/concourse/v8/atc/api/accessor"
+	"github.com/concourse/concourse/v8/atc/api/accessor/accessorfakes"
+	"github.com/concourse/concourse/v8/atc/api/apifakes"
+	"github.com/concourse/concourse/v8/atc/api/auth"
+	"github.com/concourse/concourse/v8/atc/api/containerserver/containerserverfakes"
+	"github.com/concourse/concourse/v8/atc/api/healthserver"
+	"github.com/concourse/concourse/v8/atc/api/policychecker/policycheckerfakes"
+	"github.com/concourse/concourse/v8/atc/auditor/auditorfakes"
+	"github.com/concourse/concourse/v8/atc/creds"
+	"github.com/concourse/concourse/v8/atc/creds/credsfakes"
+	"github.com/concourse/concourse/v8/atc/db"
+	"github.com/concourse/concourse/v8/atc/db/dbfakes"
+	"github.com/concourse/concourse/v8/atc/gc/gcfakes"
+	"github.com/concourse/concourse/v8/atc/policy"
+	"github.com/concourse/concourse/v8/atc/wrappa"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -240,6 +241,7 @@ func newApiTestServer(opts ...apiConfigOpt) *httptest.Server {
 		dbComponentFactory,
 		fakeDbConn,
 		testServerConfig.workerCount,
+		testServerConfig.minWorkerThresholds,
 		testServerConfig.componentStaleMultiplier,
 
 		constructedEventHandler.Construct,
@@ -284,6 +286,7 @@ func newApiTestServer(opts ...apiConfigOpt) *httptest.Server {
 
 type apiServerConfig struct {
 	workerCount              int
+	minWorkerThresholds      healthserver.MinWorkerThresholds
 	componentStaleMultiplier float64
 	concourseVersion         string
 	workerVersion            string
@@ -295,5 +298,11 @@ type apiConfigOpt func(*apiServerConfig)
 func withWorkerCount(count int) apiConfigOpt {
 	return func(a *apiServerConfig) {
 		a.workerCount = count
+	}
+}
+
+func withMinWorkerThresholds(t healthserver.MinWorkerThresholds) apiConfigOpt {
+	return func(a *apiServerConfig) {
+		a.minWorkerThresholds = t
 	}
 }

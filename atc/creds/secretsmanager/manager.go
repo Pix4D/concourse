@@ -10,7 +10,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
-	"github.com/concourse/concourse/atc/creds"
+	"github.com/concourse/concourse/v8/atc/creds"
 )
 
 const (
@@ -134,7 +134,7 @@ func (manager *Manager) NewSecretsFactory(log lager.Logger) (creds.SecretsFactor
 	return NewSecretsManagerFactory(log, cfg, []*creds.SecretTemplate{pipelineSecretTemplate, teamSecretTemplate, sharedSecretTemplate}), nil
 }
 
-func (manager Manager) Close(logger lager.Logger) {
+func (manager *Manager) Close(logger lager.Logger) {
 	// TODO - to implement
 }
 

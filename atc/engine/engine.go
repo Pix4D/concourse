@@ -8,15 +8,15 @@ import (
 
 	"code.cloudfoundry.org/lager/v3"
 	"code.cloudfoundry.org/lager/v3/lagerctx"
-	"github.com/concourse/concourse/atc"
-	"github.com/concourse/concourse/atc/builds"
-	"github.com/concourse/concourse/atc/creds"
-	"github.com/concourse/concourse/atc/db"
-	"github.com/concourse/concourse/atc/event"
-	"github.com/concourse/concourse/atc/exec"
-	"github.com/concourse/concourse/atc/metric"
-	"github.com/concourse/concourse/atc/util"
-	"github.com/concourse/concourse/tracing"
+	"github.com/concourse/concourse/v8/atc"
+	"github.com/concourse/concourse/v8/atc/builds"
+	"github.com/concourse/concourse/v8/atc/creds"
+	"github.com/concourse/concourse/v8/atc/db"
+	"github.com/concourse/concourse/v8/atc/event"
+	"github.com/concourse/concourse/v8/atc/exec"
+	"github.com/concourse/concourse/v8/atc/metric"
+	"github.com/concourse/concourse/v8/atc/util"
+	"github.com/concourse/concourse/v8/tracing"
 )
 
 //go:generate go run github.com/maxbrunsfeld/counterfeiter/v6 -generate
@@ -142,11 +142,13 @@ func (b *engineBuild) Run(ctx context.Context) {
 	}
 
 	ctx, span := tracing.StartSpanFollowing(ctx, b.build, "build", b.build.TracingAttrs())
-	defer span.End()
+	var buildErr error
+	defer func() { tracing.End(span, buildErr) }()
 
 	stepper, err := b.builder.StepperForBuild(b.build)
 	if err != nil {
 		logger.Error("failed-to-construct-build-stepper", err)
+		buildErr = err
 
 		// Fails the build if BuildStep returned an error because such unrecoverable
 		// errors will cause a build to never start to run.
@@ -164,6 +166,7 @@ func (b *engineBuild) Run(ctx context.Context) {
 	state, err := b.runState(logger, stepper)
 	if err != nil {
 		logger.Error("failed-to-create-run-state", err)
+		buildErr = err
 
 		// Fails the build if fetching the pipeline variables fails, as these errors
 		// are unrecoverable - e.g. if pipeline var_sources is wrong
@@ -177,6 +180,7 @@ func (b *engineBuild) Run(ctx context.Context) {
 	notifier, err := b.build.AbortNotifier()
 	if err != nil {
 		logger.Error("failed-to-listen-for-aborts", err)
+		buildErr = err
 		return
 	}
 
@@ -224,6 +228,11 @@ func (b *engineBuild) Run(ctx context.Context) {
 		// there is no way to abort it.
 		if b.build.Name() != db.CheckBuildName && errors.As(runErr, &exec.Retriable{}) {
 			return
+		}
+
+		// Aborted builds are not errors.
+		if !errors.Is(runErr, context.Canceled) {
+			buildErr = runErr
 		}
 
 		// An in-memory build only generates a real build id once start to run,

@@ -12,14 +12,14 @@ import (
 
 	"code.cloudfoundry.org/lager/v3"
 	"code.cloudfoundry.org/lager/v3/lagerctx"
-	"github.com/concourse/concourse/atc"
-	"github.com/concourse/concourse/atc/db"
-	"github.com/concourse/concourse/atc/exec/build"
-	"github.com/concourse/concourse/atc/runtime"
-	"github.com/concourse/concourse/atc/worker"
-	"github.com/concourse/concourse/tracing"
-	"github.com/concourse/concourse/vars"
-	"github.com/concourse/concourse/worker/baggageclaim"
+	"github.com/concourse/concourse/v8/atc"
+	"github.com/concourse/concourse/v8/atc/db"
+	"github.com/concourse/concourse/v8/atc/exec/build"
+	"github.com/concourse/concourse/v8/atc/runtime"
+	"github.com/concourse/concourse/v8/atc/worker"
+	"github.com/concourse/concourse/v8/tracing"
+	"github.com/concourse/concourse/v8/vars"
+	"github.com/concourse/concourse/v8/worker/baggageclaim"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -169,13 +169,18 @@ func (step *TaskStep) run(ctx context.Context, state RunState, delegate TaskDele
 		taskConfigSource = FileConfigSource{ConfigPath: step.plan.ConfigPath, Streamer: step.streamer}
 
 		// for interpolation - use 'vars' from the pipeline, and then fill remaining with cred variables.
-		// this 2-phase strategy allows to interpolate 'vars' by cred variables.
+		// this pass reads the file as written, before it is parsed, so a var may
+		// stand in for a field that is not a string, such as container_limits.
+		configVars := []vars.Variables{}
 		if len(step.plan.Vars) > 0 {
-			taskConfigSource = InterpolateTemplateConfigSource{
-				ConfigSource:  taskConfigSource,
-				Vars:          []vars.Variables{vars.StaticVariables(step.plan.Vars)},
-				ExpectAllKeys: false,
-			}
+			configVars = append(configVars, vars.StaticVariables(step.plan.Vars))
+		}
+		configVars = append(configVars, state)
+
+		taskConfigSource = InterpolateTemplateConfigSource{
+			ConfigSource:  taskConfigSource,
+			Vars:          configVars,
+			ExpectAllKeys: false,
 		}
 		taskVars = []vars.Variables{state}
 	} else {
@@ -394,7 +399,10 @@ func (step *TaskStep) imageSpec(ctx context.Context, logger lager.Logger, state 
 			step.plan.Tags,
 			step.plan.CheckSkipInterval,
 		)
-		return imageSpec, err
+		if err != nil {
+			return runtime.ImageSpec{}, fmt.Errorf("failed to fetch image. Check the logs for more details (gear icon) or the task's image_resource config: %w", err)
+		}
+		return imageSpec, nil
 
 		// a rootfs_uri
 	} else if config.RootfsURI != "" {

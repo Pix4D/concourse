@@ -8,10 +8,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/concourse/concourse/atc"
-	"github.com/concourse/concourse/fly/commands/internal/displayhelpers"
-	"github.com/concourse/concourse/fly/rc"
-	"github.com/concourse/concourse/fly/ui"
+	"github.com/concourse/concourse/v8/atc"
+	"github.com/concourse/concourse/v8/fly/commands/internal/displayhelpers"
+	"github.com/concourse/concourse/v8/fly/rc"
+	"github.com/concourse/concourse/v8/fly/ui"
 	"github.com/fatih/color"
 )
 
@@ -132,6 +132,7 @@ func (command *WorkersCommand) tableFor(workers []worker) ui.Table {
 			ui.TableCell{Contents: "baggageclaim url", Color: color.New(color.Bold)},
 			ui.TableCell{Contents: "active tasks", Color: color.New(color.Bold)},
 			ui.TableCell{Contents: "resource types", Color: color.New(color.Bold)},
+			ui.TableCell{Contents: "p2p streaming group", Color: color.New(color.Bold)},
 		)
 	}
 
@@ -159,6 +160,7 @@ func (command *WorkersCommand) tableFor(workers []worker) ui.Table {
 			row = append(row, stringOrDefault(w.BaggageclaimURL))
 			row = append(row, stringOrDefault(strconv.Itoa(w.ActiveTasks)))
 			row = append(row, stringOrDefault(strings.Join(resourceTypes, ", ")))
+			row = append(row, stringOrDefault(w.P2PStreamingGroup))
 		}
 
 		table.Data = append(table.Data, row)

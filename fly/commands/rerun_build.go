@@ -6,21 +6,26 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/concourse/concourse/fly/commands/internal/flaghelpers"
-	"github.com/concourse/concourse/fly/eventstream"
-	"github.com/concourse/concourse/fly/rc"
-	"github.com/concourse/concourse/fly/ui"
+	"github.com/concourse/concourse/v8/fly/commands/internal/flaghelpers"
+	"github.com/concourse/concourse/v8/fly/eventstream"
+	"github.com/concourse/concourse/v8/fly/rc"
+	"github.com/concourse/concourse/v8/fly/ui"
 )
 
 type RerunBuildCommand struct {
-	Job   flaghelpers.JobFlag `short:"j" long:"job" required:"true" value-name:"PIPELINE/JOB" description:"Name of the job that you want to rerun a build for"`
-	Build string              `short:"b" long:"build" required:"true" description:"The number of the build to rerun"`
-	Watch bool                `short:"w" long:"watch" description:"Start watching the rerun build output"`
+	Job          flaghelpers.JobFlag                `short:"j" long:"job" required:"true" value-name:"PIPELINE/JOB" description:"Name of the job that you want to rerun a build for"`
+	Build        string                             `short:"b" long:"build" required:"true" description:"The number of the build to rerun"`
+	InstanceVars []flaghelpers.YAMLVariablePairFlag `short:"i" long:"instance-var" unquote:"false" value-name:"[NAME=YAML]" description:"Specify a YAML value for an instance variable (can be specified multiple times)"`
+	Watch        bool                               `short:"w" long:"watch" description:"Start watching the rerun build output"`
+	Team         flaghelpers.TeamFlag               `long:"team" description:"Name of the team to which the job belongs, if different from the target default"`
 }
 
 func (command *RerunBuildCommand) Execute(args []string) error {
 	jobName, buildName := command.Job.JobName, command.Build
 	pipelineRef := command.Job.PipelineRef
+	if err := flaghelpers.ApplyInstanceVars(&pipelineRef, command.InstanceVars); err != nil {
+		return err
+	}
 
 	target, err := rc.LoadTarget(Fly.Target, Fly.Verbose)
 	if err != nil {
@@ -32,7 +37,12 @@ func (command *RerunBuildCommand) Execute(args []string) error {
 		return err
 	}
 
-	build, err := target.Team().RerunJobBuild(pipelineRef, jobName, buildName)
+	team, err := command.Team.LoadTeam(target)
+	if err != nil {
+		return err
+	}
+
+	build, err := team.RerunJobBuild(pipelineRef, jobName, buildName)
 	if err != nil {
 		return err
 	}

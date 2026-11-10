@@ -7,24 +7,24 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/concourse/concourse/tracing"
+	"github.com/concourse/concourse/v8/tracing"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/gbytes"
 	"go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 
-	"github.com/concourse/concourse/atc"
-	"github.com/concourse/concourse/atc/db"
-	"github.com/concourse/concourse/atc/db/dbfakes"
-	"github.com/concourse/concourse/atc/exec"
-	"github.com/concourse/concourse/atc/exec/build"
-	"github.com/concourse/concourse/atc/exec/execfakes"
-	"github.com/concourse/concourse/atc/resource"
-	"github.com/concourse/concourse/atc/runtime"
-	"github.com/concourse/concourse/atc/runtime/runtimetest"
-	"github.com/concourse/concourse/atc/worker"
-	"github.com/concourse/concourse/vars"
+	"github.com/concourse/concourse/v8/atc"
+	"github.com/concourse/concourse/v8/atc/db"
+	"github.com/concourse/concourse/v8/atc/db/dbfakes"
+	"github.com/concourse/concourse/v8/atc/exec"
+	"github.com/concourse/concourse/v8/atc/exec/build"
+	"github.com/concourse/concourse/v8/atc/exec/execfakes"
+	"github.com/concourse/concourse/v8/atc/resource"
+	"github.com/concourse/concourse/v8/atc/runtime"
+	"github.com/concourse/concourse/v8/atc/runtime/runtimetest"
+	"github.com/concourse/concourse/v8/atc/worker"
+	"github.com/concourse/concourse/v8/vars"
 )
 
 var _ = Describe("PutStep", func() {
@@ -464,6 +464,21 @@ var _ = Describe("PutStep", func() {
 			Expect(actualGetImagePlan).To(Equal(*putPlan.TypeImage.GetPlan))
 			Expect(actualCheckImagePlan).To(Equal(putPlan.TypeImage.CheckPlan))
 			Expect(privileged).To(BeFalse())
+		})
+
+		Context("when fetching the image fails", func() {
+			var fetchErr error
+
+			BeforeEach(func() {
+				fetchErr = errors.New("Version is missing from previous step")
+				fakeDelegate.FetchImageReturns(runtime.ImageSpec{}, nil, fetchErr)
+			})
+
+			It("returns the error with resource type image context", func() {
+				Expect(stepOk).To(BeFalse())
+				Expect(stepErr).To(MatchError("failed to fetch image. Check the logs for more details (gear icon) or the resource_type config for this resource: Version is missing from previous step"))
+				Expect(errors.Is(stepErr, fetchErr)).To(BeTrue())
+			})
 		})
 
 		It("sets the bottom-most type in the worker spec", func() {

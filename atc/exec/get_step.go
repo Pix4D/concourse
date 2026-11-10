@@ -10,16 +10,16 @@ import (
 
 	"code.cloudfoundry.org/lager/v3"
 	"code.cloudfoundry.org/lager/v3/lagerctx"
-	"github.com/concourse/concourse/atc"
-	"github.com/concourse/concourse/atc/creds"
-	"github.com/concourse/concourse/atc/db"
-	"github.com/concourse/concourse/atc/db/lock"
-	"github.com/concourse/concourse/atc/exec/build"
-	"github.com/concourse/concourse/atc/metric"
-	"github.com/concourse/concourse/atc/resource"
-	"github.com/concourse/concourse/atc/runtime"
-	"github.com/concourse/concourse/atc/worker"
-	"github.com/concourse/concourse/tracing"
+	"github.com/concourse/concourse/v8/atc"
+	"github.com/concourse/concourse/v8/atc/creds"
+	"github.com/concourse/concourse/v8/atc/db"
+	"github.com/concourse/concourse/v8/atc/db/lock"
+	"github.com/concourse/concourse/v8/atc/exec/build"
+	"github.com/concourse/concourse/v8/atc/metric"
+	"github.com/concourse/concourse/v8/atc/resource"
+	"github.com/concourse/concourse/v8/atc/runtime"
+	"github.com/concourse/concourse/v8/atc/worker"
+	"github.com/concourse/concourse/v8/tracing"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -170,7 +170,7 @@ func (step *GetStep) run(ctx context.Context, state RunState, delegate GetDelega
 		var err error
 		imageSpec, imageResourceCache, err = delegate.FetchImage(ctx, *step.plan.TypeImage.GetPlan, step.plan.TypeImage.CheckPlan, step.plan.TypeImage.Privileged)
 		if err != nil {
-			return false, err
+			return false, fmt.Errorf("failed to fetch image. Check the logs for more details (gear icon) or the resource_type config for this resource: %w", err)
 		}
 	} else {
 		imageSpec.ResourceType = step.plan.TypeImage.BaseType

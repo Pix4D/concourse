@@ -5,9 +5,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
+	"net/url"
 	"os"
+	"regexp"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -15,11 +19,10 @@ import (
 	"code.cloudfoundry.org/lager/v3/lagerctx"
 	"github.com/google/uuid"
 	"github.com/tedsuo/rata"
-	"go.opentelemetry.io/otel/propagation"
 
-	"github.com/concourse/concourse/tracing"
-	"github.com/concourse/concourse/worker/baggageclaim"
-	"github.com/concourse/concourse/worker/baggageclaim/volume"
+	"github.com/concourse/concourse/v8/tracing"
+	"github.com/concourse/concourse/v8/worker/baggageclaim"
+	"github.com/concourse/concourse/v8/worker/baggageclaim/volume"
 )
 
 const httpUnprocessableEntity = 422
@@ -35,11 +38,19 @@ var ErrStreamInFailed = errors.New("failed to stream in to volume")
 var ErrStreamOutFailed = errors.New("failed to stream out from volume")
 var ErrStreamOutNotFound = errors.New("no such file or directory")
 var ErrStreamP2pOutFailed = errors.New("failed to stream p2p out from volume")
+var ErrGetP2pUrlFailed = errors.New("failed to get p2p url, network interface list is empty")
+var ErrGetListSysNetworkInterface = errors.New("failed to get a list of the system's network interface")
+var ErrGetNetworkInterfaceAddr = errors.New("failed to get network interface addr for given interface")
+var ErrInvalidStreamInURL = errors.New("invalid stream in URL")
 
 type VolumeServer struct {
 	strategizer    volume.Strategizer
 	volumeRepo     volume.Repository
 	volumePromises volume.PromiseList
+
+	p2pInterfacePattern *regexp.Regexp
+	p2pInterfaceFamily  int
+	p2pStreamPort       uint16
 
 	logger lager.Logger
 }
@@ -48,12 +59,18 @@ func NewVolumeServer(
 	logger lager.Logger,
 	strategizer volume.Strategizer,
 	volumeRepo volume.Repository,
+	p2pInterfacePattern *regexp.Regexp,
+	p2pInterfaceFamily int,
+	p2pStreamPort uint16,
 ) *VolumeServer {
 	return &VolumeServer{
-		strategizer:    strategizer,
-		volumeRepo:     volumeRepo,
-		volumePromises: volume.NewPromiseList(),
-		logger:         logger,
+		strategizer:         strategizer,
+		volumeRepo:          volumeRepo,
+		volumePromises:      volume.NewPromiseList(),
+		p2pInterfacePattern: p2pInterfacePattern,
+		p2pInterfaceFamily:  p2pInterfaceFamily,
+		p2pStreamPort:       p2pStreamPort,
+		logger:              logger,
 	}
 }
 
@@ -86,7 +103,6 @@ func (vs *VolumeServer) CreateVolume(w http.ResponseWriter, req *http.Request) {
 }
 
 func (vs *VolumeServer) CreateVolumeAsync(w http.ResponseWriter, req *http.Request) {
-	ctx := tracing.Extract(req.Context(), propagation.HeaderCarrier(req.Header))
 	hLog := vs.logger.Session("create-volume-async")
 
 	hLog.Debug("start")
@@ -97,11 +113,12 @@ func (vs *VolumeServer) CreateVolumeAsync(w http.ResponseWriter, req *http.Reque
 		return
 	}
 
-	ctx, span := tracing.StartSpan(ctx, "server.CreateVolumeAsync", tracing.Attrs{
+	// The volume is created after the response is sent, so the span and the
+	// context must outlive the request.
+	ctx, span := tracing.StartSpan(context.WithoutCancel(req.Context()), "server.CreateVolumeAsync", tracing.Attrs{
 		"volume":   handle,
 		"strategy": strategy.String(),
 	})
-	defer span.End()
 
 	handlers := &createVolumeHandlerAsync{
 		promise: volume.NewPromise(),
@@ -112,10 +129,14 @@ func (vs *VolumeServer) CreateVolumeAsync(w http.ResponseWriter, req *http.Reque
 	if err != nil {
 		hLog.Error("failed-to-add-promise", err)
 		RespondWithError(w, err, http.StatusInternalServerError)
+		tracing.End(span, err)
 		return
 	}
 
-	go vs.doCreate(ctx, w, request, handle, strategy, hLog, handlers)
+	go func() {
+		_, err := vs.doCreate(ctx, w, request, handle, strategy, hLog, handlers)
+		tracing.End(span, err)
+	}()
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
@@ -484,7 +505,6 @@ func (vs *VolumeServer) SetPrivileged(w http.ResponseWriter, req *http.Request) 
 func (vs *VolumeServer) StreamIn(w http.ResponseWriter, req *http.Request) {
 	handle := rata.Param(req, "handle")
 
-	ctx := tracing.Extract(req.Context(), propagation.HeaderCarrier(req.Header))
 	hLog := vs.logger.Session("stream-in", lager.Data{
 		"volume": handle,
 	})
@@ -492,7 +512,7 @@ func (vs *VolumeServer) StreamIn(w http.ResponseWriter, req *http.Request) {
 	hLog.Debug("start")
 	defer hLog.Debug("done")
 
-	ctx = lagerctx.NewContext(req.Context(), hLog)
+	ctx := lagerctx.NewContext(req.Context(), hLog)
 
 	var subPath string
 	if queryPath, ok := req.URL.Query()["path"]; ok {
@@ -547,7 +567,6 @@ func (vs *VolumeServer) StreamIn(w http.ResponseWriter, req *http.Request) {
 func (vs *VolumeServer) StreamOut(w http.ResponseWriter, req *http.Request) {
 	handle := rata.Param(req, "handle")
 
-	ctx := tracing.Extract(req.Context(), propagation.HeaderCarrier(req.Header))
 	hLog := vs.logger.Session("stream-out", lager.Data{
 		"volume": handle,
 	})
@@ -555,7 +574,7 @@ func (vs *VolumeServer) StreamOut(w http.ResponseWriter, req *http.Request) {
 	hLog.Debug("start")
 	defer hLog.Debug("done")
 
-	ctx = lagerctx.NewContext(req.Context(), hLog)
+	ctx := lagerctx.NewContext(req.Context(), hLog)
 
 	var subPath string
 	if queryPath, ok := req.URL.Query()["path"]; ok {
@@ -588,10 +607,59 @@ func (vs *VolumeServer) StreamOut(w http.ResponseWriter, req *http.Request) {
 	}
 }
 
+func (vs *VolumeServer) GetP2pUrl(w http.ResponseWriter, req *http.Request) {
+	hLog := vs.logger.Session("get-p2p-url")
+	hLog.Debug("start")
+	defer hLog.Debug("done")
+
+	ifaces, err := net.Interfaces()
+	if err != nil {
+		RespondWithError(w, ErrGetListSysNetworkInterface, http.StatusInternalServerError)
+		return
+	}
+
+	for _, i := range ifaces {
+		if !vs.p2pInterfacePattern.MatchString(i.Name) {
+			continue
+		}
+
+		addrs, err := i.Addrs()
+		if err != nil {
+			RespondWithError(w, ErrGetNetworkInterfaceAddr, http.StatusInternalServerError)
+			return
+		}
+
+		for _, addr := range addrs {
+			var ip net.IP
+			switch v := addr.(type) {
+			case *net.IPNet:
+				ip = v.IP
+			case *net.IPAddr:
+				ip = v.IP
+			}
+
+			if vs.p2pInterfaceFamily == 6 {
+				if strings.Contains(ip.String(), ".") {
+					continue
+				}
+			} else { // Default to use IPv4
+				if strings.Contains(ip.String(), ":") {
+					continue
+				}
+			}
+			hLog.Debug("found-ip", lager.Data{"ip": ip.String()})
+
+			fmt.Fprintf(w, "http://%s:%d", ip.String(), vs.p2pStreamPort)
+			return
+		}
+	}
+
+	RespondWithError(w, ErrGetP2pUrlFailed, http.StatusInternalServerError)
+}
+
 func (vs *VolumeServer) StreamP2pOut(w http.ResponseWriter, req *http.Request) {
 	handle := rata.Param(req, "handle")
 
-	ctx := tracing.Extract(req.Context(), propagation.HeaderCarrier(req.Header))
 	hLog := vs.logger.Session("stream-p2p-out", lager.Data{
 		"volume": handle,
 	})
@@ -599,7 +667,7 @@ func (vs *VolumeServer) StreamP2pOut(w http.ResponseWriter, req *http.Request) {
 	hLog.Debug("start")
 	defer hLog.Debug("done")
 
-	ctx = lagerctx.NewContext(req.Context(), hLog)
+	ctx := lagerctx.NewContext(req.Context(), hLog)
 
 	var subPath, streamInURL, encoding string
 	if queryPath, ok := req.URL.Query()["path"]; ok {
@@ -618,6 +686,14 @@ func (vs *VolumeServer) StreamP2pOut(w http.ResponseWriter, req *http.Request) {
 		RespondWithError(w, ErrStreamP2pOutFailed, http.StatusBadRequest)
 		return
 	}
+
+	err := vs.validateStreamInURL(streamInURL)
+	if err != nil {
+		hLog.Info("invalid-streamInURL", lager.Data{"stream-in-url": streamInURL})
+		RespondWithError(w, ErrInvalidStreamInURL, http.StatusBadRequest)
+		return
+	}
+
 	if queryPath, ok := req.URL.Query()["encoding"]; ok {
 		encoding = queryPath[0]
 	}
@@ -629,22 +705,30 @@ func (vs *VolumeServer) StreamP2pOut(w http.ResponseWriter, req *http.Request) {
 
 	w.Header().Set("Content-Type", "plain/text")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
+	// Declaring the trailer before the first write lets the byte count follow
+	// the body. Clients that predate the trailer keep reading the unchanged
+	// "ok"/error body.
+	w.Header().Set("Trailer", baggageclaim.StreamP2pOutBytesTrailer)
 
-	doneChan := make(chan error, 1)
-	go func(doneChan chan<- error) {
-		err := vs.volumeRepo.StreamP2pOut(ctx, handle, subPath, baggageclaim.Encoding(encoding), streamInURL)
+	type streamResult struct {
+		bytesSent int64
+		err       error
+	}
+	doneChan := make(chan streamResult, 1)
+	go func() {
+		bytesSent, err := vs.volumeRepo.StreamP2pOut(ctx, handle, subPath, baggageclaim.Encoding(encoding), streamInURL)
 		if err != nil {
 			hLog.Error("failed-to-stream-out", err)
-			doneChan <- fmt.Errorf("%s: %w", ErrStreamP2pOutFailed, err)
-		} else {
-			close(doneChan)
+			err = fmt.Errorf("%s: %w", ErrStreamP2pOutFailed, err)
 		}
-	}(doneChan)
+		doneChan <- streamResult{bytesSent: bytesSent, err: err}
+	}()
 
 	// Send a white space to client as an indicator of in-progress every 30 seconds.
 	// After source worker finishes sending volume to dest worker, send client "ok"
-	// for success or an error message.
+	// for success or an error message, followed by the byte count as a trailer.
 	tick := time.NewTicker(30 * time.Second)
+	defer tick.Stop()
 	for {
 		select {
 		case <-tick.C:
@@ -652,16 +736,55 @@ func (vs *VolumeServer) StreamP2pOut(w http.ResponseWriter, req *http.Request) {
 			if f, ok := w.(http.Flusher); ok {
 				f.Flush()
 			}
-		case err := <-doneChan:
-			if err != nil {
-				fmt.Fprintf(w, "%s", err.Error())
+		case result := <-doneChan:
+			if result.err != nil {
+				fmt.Fprintf(w, "%s", result.err.Error())
 			} else {
 				fmt.Fprintf(w, "ok")
 			}
-			tick.Stop()
+			// Set after the final body write so that the count is sent only as a
+			// trailer and not also as a header.
+			w.Header().Set(baggageclaim.StreamP2pOutBytesTrailer, strconv.FormatInt(result.bytesSent, 10))
 			return
 		}
 	}
+}
+
+func (vs *VolumeServer) validateStreamInURL(streamInURL string) error {
+	u, err := url.Parse(streamInURL)
+	if err != nil {
+		return err
+	}
+
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return ErrInvalidStreamInURL
+	}
+
+	if u.Port() == "" || u.Hostname() == "" {
+		return ErrInvalidStreamInURL
+	}
+
+	if net.ParseIP(u.Hostname()) == nil {
+		return ErrInvalidStreamInURL
+	}
+
+	var pathRegex = regexp.MustCompile(`^/volumes/[^/]+/stream-in$`)
+	if !pathRegex.MatchString(u.Path) {
+		return ErrInvalidStreamInURL
+	}
+
+	params, err := url.ParseQuery(u.RawQuery)
+	if err != nil {
+		return err
+	}
+
+	for key, _ := range params {
+		if key != "path" && key != "limit" {
+			return ErrInvalidStreamInURL
+		}
+	}
+
+	return nil
 }
 
 func (vs *VolumeServer) generateHandle() (string, error) {

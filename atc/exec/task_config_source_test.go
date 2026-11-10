@@ -6,13 +6,13 @@ import (
 	"fmt"
 
 	"code.cloudfoundry.org/lager/v3/lagertest"
-	"github.com/concourse/concourse/atc"
-	. "github.com/concourse/concourse/atc/exec"
-	"github.com/concourse/concourse/atc/exec/build"
-	"github.com/concourse/concourse/atc/exec/execfakes"
-	"github.com/concourse/concourse/atc/runtime/runtimetest"
-	"github.com/concourse/concourse/vars"
-	"github.com/concourse/concourse/worker/baggageclaim"
+	"github.com/concourse/concourse/v8/atc"
+	. "github.com/concourse/concourse/v8/atc/exec"
+	"github.com/concourse/concourse/v8/atc/exec/build"
+	"github.com/concourse/concourse/v8/atc/exec/execfakes"
+	"github.com/concourse/concourse/v8/atc/runtime/runtimetest"
+	"github.com/concourse/concourse/v8/vars"
+	"github.com/concourse/concourse/v8/worker/baggageclaim"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/gbytes"
@@ -554,6 +554,64 @@ run: {path: a/file}
 					"a":               "b",
 					"evaluated-value": "((task-variable-name))",
 				}))
+			})
+		})
+
+		Context("when the config comes from a file that uses vars in container_limits", func() {
+			var (
+				fakeStreamer *execfakes.FakeStreamer
+				artifactName string
+			)
+
+			BeforeEach(func() {
+				artifactName = "some-artifact-name"
+				fakeStreamer = new(execfakes.FakeStreamer)
+				repo.RegisterArtifact(build.ArtifactName(artifactName), runtimetest.NewVolume("some-volume"), false)
+				fakeStreamer.StreamFileReturns(gbytes.BufferWithBytes([]byte(`
+platform: linux
+
+container_limits:
+  cpu: ((container_cpu_limit))
+  memory: ((container_mem_limit))
+
+run: {path: ls}
+`)), nil)
+			})
+
+			JustBeforeEach(func() {
+				configSource = FileConfigSource{
+					ConfigPath: artifactName + "/build.yml",
+					Streamer:   fakeStreamer,
+				}
+				configSource = InterpolateTemplateConfigSource{
+					ConfigSource: configSource,
+					Vars: []vars.Variables{vars.StaticVariables{
+						"container_cpu_limit": 512,
+						"container_mem_limit": "5gb",
+					}},
+					ExpectAllKeys: true,
+				}
+				fetchedConfig, fetchErr = configSource.FetchConfig(context.TODO(), logger, repo)
+			})
+
+			It("interpolates the vars before the config is parsed", func() {
+				Expect(fetchErr).ToNot(HaveOccurred())
+				Expect(fetchedConfig.Limits).To(Equal(&atc.ContainerLimits{
+					CPU:    newCPULimit(512),
+					Memory: newMemoryLimit(5 * 1024 * 1024 * 1024),
+				}))
+			})
+
+			Context("when the file is still invalid once the vars are resolved", func() {
+				BeforeEach(func() {
+					fakeStreamer.StreamFileReturns(gbytes.BufferWithBytes([]byte(`
+container_limits: {cpu: ((container_cpu_limit))}
+`)), nil)
+				})
+
+				It("names the file it could not parse", func() {
+					Expect(fetchErr).To(MatchError(ContainSubstring(artifactName + "/build.yml")))
+				})
 			})
 		})
 	})

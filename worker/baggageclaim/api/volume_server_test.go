@@ -16,19 +16,22 @@ import (
 	"strings"
 	"time"
 
-	"github.com/concourse/concourse/go-archive/tarfs"
+	"github.com/concourse/concourse/v8/go-archive/tarfs"
 	"github.com/klauspost/compress/zstd"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 
 	"code.cloudfoundry.org/lager/v3/lagertest"
-	"github.com/concourse/concourse/go-archive/tgzfs"
+	"github.com/concourse/concourse/v8/go-archive/tgzfs"
 
-	"github.com/concourse/concourse/worker/baggageclaim"
-	"github.com/concourse/concourse/worker/baggageclaim/api"
-	"github.com/concourse/concourse/worker/baggageclaim/uidgid"
-	"github.com/concourse/concourse/worker/baggageclaim/volume"
-	"github.com/concourse/concourse/worker/baggageclaim/volume/driver"
+	"github.com/concourse/concourse/v8/tracing"
+	"github.com/concourse/concourse/v8/worker/baggageclaim"
+	"github.com/concourse/concourse/v8/worker/baggageclaim/api"
+	"github.com/concourse/concourse/v8/worker/baggageclaim/uidgid"
+	"github.com/concourse/concourse/v8/worker/baggageclaim/volume"
+	"github.com/concourse/concourse/v8/worker/baggageclaim/volume/driver"
 )
 
 var _ = Describe("Volume Server", func() {
@@ -37,10 +40,13 @@ var _ = Describe("Volume Server", func() {
 
 		volumeDir string
 		tempDir   string
+
+		networkInterface string
 	)
 
 	BeforeEach(func() {
 		var err error
+		networkInterface = "lo"
 
 		tempDir, err = os.MkdirTemp("", fmt.Sprintf("baggageclaim_volume_dir_%d", GinkgoParallelProcess()))
 		Expect(err).NotTo(HaveOccurred())
@@ -80,11 +86,12 @@ var _ = Describe("Volume Server", func() {
 			volume.NewLockManager(),
 			privilegedNamespacer,
 			unprivilegedNamespacer,
+			false,
 		)
 
 		strategizer := volume.NewStrategizer()
 
-		re := regexp.MustCompile("lo")
+		re := regexp.MustCompile(networkInterface)
 		handler, err = api.NewHandler(logger, strategizer, repo, re, 4, 7766)
 		Expect(err).NotTo(HaveOccurred())
 	})
@@ -112,6 +119,43 @@ var _ = Describe("Volume Server", func() {
 			It("returns an empty array", func() {
 				Expect(recorder.Body).To(MatchJSON(`[]`))
 			})
+		})
+	})
+
+	Describe("tracing", func() {
+		var spanRecorder *tracetest.SpanRecorder
+
+		BeforeEach(func() {
+			spanRecorder = new(tracetest.SpanRecorder)
+			tracing.ConfigureTraceProvider(sdktrace.NewTracerProvider(sdktrace.WithSpanProcessor(spanRecorder)))
+		})
+
+		AfterEach(func() {
+			tracing.Configured = false
+		})
+
+		It("continues the trace from the request headers", func() {
+			body := &bytes.Buffer{}
+			err := json.NewEncoder(body).Encode(baggageclaim.VolumeRequest{
+				Handle: "some-handle",
+				Strategy: encStrategy(map[string]string{
+					"type": "empty",
+				}),
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			request, err := http.NewRequest("POST", "/volumes", body)
+			Expect(err).NotTo(HaveOccurred())
+			request.Header.Set("traceparent", "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01")
+
+			recorder := httptest.NewRecorder()
+			handler.ServeHTTP(recorder, request)
+			Expect(recorder.Code).To(Equal(http.StatusCreated))
+
+			Expect(spanRecorder.Ended()).ToNot(BeEmpty())
+			for _, span := range spanRecorder.Ended() {
+				Expect(span.SpanContext().TraceID().String()).To(Equal("4bf92f3577b34da6a3ce929d0e0e4736"))
+			}
 		})
 	})
 
@@ -1275,6 +1319,49 @@ var _ = Describe("Volume Server", func() {
 			Expect(recorder.Body.String()).To(MatchRegexp("failed to compress source volume: .*: (no such file or directory|The system cannot find the file specified)"))
 		})
 
+		DescribeTable("validates the streamInURL", func(streamInP2pURL string, expectedStatus int, match OmegaMatcher) {
+			filePath := filepath.Join(volumeDir, "live", myVolume.Handle, "volume", "some-file")
+			err := os.WriteFile(filePath, []byte("some-file-content"), os.ModePerm)
+			Expect(err).ToNot(HaveOccurred())
+
+			request, err := http.NewRequest("PUT",
+				fmt.Sprintf("/volumes/%s/stream-p2p-out?path=%s&streamInURL=%s&encoding=%s",
+					myVolume.Handle, "some-file", streamInP2pURL, string(baggageclaim.GzipEncoding)), nil)
+			Expect(err).NotTo(HaveOccurred())
+			request.Header.Set("Accept-Encoding", string(baggageclaim.GzipEncoding))
+			recorder := httptest.NewRecorder()
+			handler.ServeHTTP(recorder, request)
+
+			Expect(recorder.Code).To(Equal(expectedStatus))
+			Expect(recorder.Body.String()).To(match)
+		},
+			Entry("returns an error when url has no scheme",
+				"127.0.0.1:7788/volumes/some-handle/stream-in?path=dest-path", http.StatusBadRequest,
+				MatchJSON(`{"error":"invalid stream in URL"}`),
+			),
+			Entry("returns an error when url has no port",
+				"http://127.0.0.1/volumes/some-handle/stream-in?path=dest-path", http.StatusBadRequest,
+				MatchJSON(`{"error":"invalid stream in URL"}`),
+			),
+			Entry("returns an error when url has query params other than 'path' or 'limit'",
+				"http://127.0.0.1:7788/volumes/some-handle/stream-in?foo=bar", http.StatusBadRequest,
+				MatchJSON(`{"error":"invalid stream in URL"}`),
+			),
+			Entry("returns an error when url has an invalid endpoint path",
+				"http://127.0.0.1:7788/foo/some-handle/bar?path=dest-path", http.StatusBadRequest,
+				MatchJSON(`{"error":"invalid stream in URL"}`),
+			),
+			Entry("returns an error when url's hostname is not an ip address",
+				"http://some-worker:7788/volumes/some-handle/stream-in?path=dest-path", http.StatusBadRequest,
+				MatchJSON(`{"error":"invalid stream in URL"}`),
+			),
+			Entry("should succeed",
+				"http://127.0.0.1:7788/volumes/some-handle/stream-in?path=dest-path", http.StatusOK,
+				// Expected error when it tries to stream, indicating we've passed validation
+				HavePrefix("failed to stream p2p out from volume"),
+			),
+		)
+
 		Context("when streaming a file", func() {
 			JustBeforeEach(func() {
 				// Create a file in the volume.
@@ -1364,6 +1451,45 @@ var _ = Describe("Volume Server", func() {
 				It("should succeed", func() {
 					// real tests are in JustBeforeEach
 				})
+			})
+		})
+	})
+
+	Describe("get p2p url", func() {
+		var (
+			request  *http.Request
+			recorder *httptest.ResponseRecorder
+		)
+		JustBeforeEach(func() {
+			var err error
+			request, err = http.NewRequest("GET", "/p2p-url", nil)
+			Expect(err).NotTo(HaveOccurred())
+
+			recorder = httptest.NewRecorder()
+			handler.ServeHTTP(recorder, request)
+		})
+
+		Context("when a valid interface name is given", func() {
+			BeforeEach(func() {
+				networkInterface = "lo"
+				if runtime.GOOS == "windows" {
+					networkInterface = "Loopback"
+				}
+			})
+
+			It("returns a url successfully", func() {
+				Expect(recorder.Code).To(Equal(200))
+				Expect(recorder.Body.String()).To(Equal("http://127.0.0.1:7766"))
+			})
+		})
+
+		Context("when an invalid interface name is given", func() {
+			BeforeEach(func() {
+				networkInterface = "dummy_interface"
+			})
+
+			It("returns a url successfully", func() {
+				Expect(recorder.Code).To(Equal(500))
 			})
 		})
 	})
